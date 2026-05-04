@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestor RH</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#F5F4F0;--surface:#FFF;--surface2:#F0EFE9;--border:#E2E0D8;--border2:#CCCAB8;
+    --text:#1A1916;--text2:#6B6960;--text3:#A8A59A;
+    --accent:#2D6A4F;--accent-bg:#E8F5EE;--accent-text:#1B4332;
+    --warn:#92400E;--warn-bg:#FEF3C7;--danger:#991B1B;--danger-bg:#FEE2E2;
+    --radius:10px;--radius-sm:6px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh}
+  .app{display:flex;min-height:100vh}
+  .sidebar{width:220px;background:var(--text);color:#fff;display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;bottom:0}
+  .sidebar-logo{padding:24px 20px 20px;border-bottom:1px solid rgba(255,255,255,.08)}
+  .sidebar-logo h1{font-size:15px;font-weight:600;letter-spacing:-.3px;color:#fff}
+  .sidebar-logo p{font-size:11px;color:rgba(255,255,255,.4);margin-top:2px}
+  .nav{padding:12px 10px;flex:1}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);cursor:pointer;font-size:13px;color:rgba(255,255,255,.55);transition:all .15s;margin-bottom:2px;border:none;background:none;width:100%;text-align:left}
+  .nav-item:hover{background:rgba(255,255,255,.07);color:rgba(255,255,255,.85)}
+  .nav-item.active{background:rgba(255,255,255,.12);color:#fff;font-weight:500}
+  .nav-icon{width:16px;height:16px;opacity:.7;flex-shrink:0}
+  .nav-item.active .nav-icon{opacity:1}
+  .sync-status{padding:14px 16px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;color:rgba(255,255,255,.35);display:flex;align-items:center;gap:8px}
+  .sync-dot{width:6px;height:6px;border-radius:50%;background:#6EE7B7;flex-shrink:0}
+  .sync-dot.loading{background:#FCD34D;animation:blink 1s infinite}
+  .sync-dot.error{background:#FCA5A5}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+  .main{margin-left:220px;flex:1;padding:32px 36px;max-width:calc(100vw - 220px)}
+  .page{display:none}.page.active{display:block}
+  .page-header{margin-bottom:28px}
+  .page-header h2{font-size:22px;font-weight:600;letter-spacing:-.4px}
+  .page-header p{font-size:13px;color:var(--text2);margin-top:4px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:16px}
+  .card-title{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:16px}
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+  .metric{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px}
+  .metric-label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+  .metric-value{font-size:22px;font-weight:600;letter-spacing:-.5px;font-family:'DM Mono',monospace}
+  .form-row{display:grid;gap:12px}
+  .cols-2{grid-template-columns:1fr 1fr}
+  .form-group{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+  .form-group label{font-size:12px;font-weight:500;color:var(--text2)}
+  input[type=text],input[type=number],input[type=date],input[type=time],input[type=month],select{
+    width:100%;padding:8px 11px;border:1px solid var(--border2);border-radius:var(--radius-sm);
+    font-size:13px;font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text);
+    outline:none;transition:border .15s}
+  input:focus,select:focus{border-color:var(--accent)}
+  input[type=number]{font-family:'DM Mono',monospace}
+  .btn{padding:8px 16px;border-radius:var(--radius-sm);font-size:13px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;border:1px solid var(--border2);background:var(--surface);color:var(--text);transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+  .btn:hover{background:var(--surface2)}
+  .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn-primary:hover{background:#235c43;border-color:#235c43}
+  .btn-danger{color:var(--danger);border-color:#FECACA;background:var(--danger-bg)}
+  .btn-sm{padding:4px 10px;font-size:12px}
+  .save-row{display:flex;align-items:center;gap:12px;margin-top:4px}
+  .save-msg{font-size:12px;color:var(--accent);display:none}
+  .table-wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;padding:9px 12px;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border);white-space:nowrap}
+  td{padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:var(--bg)}
+  .badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:500}
+  .badge-green{background:var(--accent-bg);color:var(--accent-text)}
+  .badge-amber{background:var(--warn-bg);color:var(--warn)}
+  .badge-red{background:var(--danger-bg);color:var(--danger)}
+  .empty{text-align:center;padding:32px;color:var(--text3);font-size:13px}
+  .sep{height:1px;background:var(--border);margin:16px 0}
+  .section-label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px}
+
+  /* TABELA DE ESCALA POR DIA */
+  .escala-table{width:100%;border-collapse:collapse;font-size:13px}
+  .escala-table th{text-align:left;padding:7px 10px;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);background:var(--surface)}
+  .escala-table td{padding:5px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+  .escala-table tr:last-child td{border-bottom:none}
+  .escala-table tr.folga-row td{background:var(--surface2);opacity:.6}
+  .escala-table input[type=time]{width:100px;padding:5px 7px;font-size:12px;margin:0}
+  .escala-table input[type=number]{width:76px;padding:5px 7px;font-size:12px;margin:0}
+  .dia-label{font-weight:600;font-size:12px;min-width:40px}
+  .folga-tag{font-size:11px;color:var(--text3);font-style:italic}
+  .horas-calc{font-size:11px;font-family:'DM Mono',monospace;color:var(--accent);min-width:50px;text-align:right}
+
+  /* PONTO CARDS */
+  .ponto-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .ponto-card{border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;display:flex;align-items:center;gap:12px;background:var(--surface);transition:all .15s}
+  .ponto-card.trabalhou{border-color:#86EFAC;background:#F0FDF4}
+  .ponto-card.folga{border-color:var(--border);background:var(--surface2);opacity:.7}
+  .ponto-card.falta{border-color:#FCA5A5;background:#FFF5F5}
+  .ponto-info{flex:1;min-width:0}
+  .ponto-nome{font-weight:600;font-size:13px}
+  .ponto-horario{font-size:11px;color:var(--text2);margin-top:2px;font-family:'DM Mono',monospace}
+  .ponto-vt{font-size:11px;color:var(--text3);margin-top:1px}
+  .ponto-select select{margin:0;width:120px;font-size:12px;padding:5px 8px}
+
+  /* COMISSÃO */
+  .com-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+  .com-row:last-child{border-bottom:none}
+  .com-row input[type=checkbox]{width:16px;height:16px;cursor:pointer;flex-shrink:0;accent-color:var(--accent)}
+  .com-nome{flex:1;font-size:13px}
+  .com-valor{font-family:'DM Mono',monospace;font-size:13px;font-weight:600;min-width:90px;text-align:right;color:var(--accent)}
+  .com-info-bar{background:var(--accent-bg);color:var(--accent-text);border-radius:var(--radius-sm);padding:8px 14px;font-size:13px;margin-bottom:12px;display:none}
+  .filter-row{display:flex;gap:12px;margin-bottom:20px;align-items:flex-end;flex-wrap:wrap}
+  .filter-row .form-group{margin:0;min-width:160px}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <h1>Gestor RH</h1>
+      <p>Ponto · VT · Comissão</p>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" onclick="goPage('funcionarios',this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="5" r="2.5"/><path d="M1 13c0-3 2-4.5 5-4.5s5 1.5 5 4.5M11 7.5a2 2 0 1 0 0-4M15 13c0-2.5-1.5-4-4-4"/></svg>
+        Funcionários
+      </button>
+
+      <button class="nav-item" onclick="goPage('comissao',this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5" cy="5" r="2"/><circle cx="11" cy="11" r="2"/><path d="M3 13L13 3"/></svg>
+        Comissão
+      </button>
+      <button class="nav-item" onclick="goPage('resumo',this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12l4-4 3 3 5-6M10 5h4v4"/></svg>
+        Resumo mensal
+      </button>
+    </nav>
+    <div class="sync-status">
+      <div class="sync-dot loading" id="sync-dot"></div>
+      <span id="sync-msg">Conectando...</span>
+    </div>
+  </aside>
+
+  <!-- MODAL EDIÇÃO -->
+  <div id="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;align-items:center;justify-content:center">
+    <div style="background:var(--surface);border-radius:var(--radius);padding:28px;width:740px;max-width:95vw;max-height:90vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <h3 style="font-size:16px;font-weight:600">Editar funcionário</h3>
+        <button class="btn btn-sm" onclick="fecharModal()">✕ Fechar</button>
+      </div>
+      <div class="form-row cols-2">
+        <div class="form-group"><label>Nome completo</label><input type="text" id="e-nome"></div>
+        <div class="form-group"><label>Cargo / função</label><input type="text" id="e-cargo"></div>
+      </div>
+      <div class="sep"></div>
+      <div class="section-label">Escala semanal — horário e VT por dia</div>
+      <div class="table-wrap">
+        <table class="escala-table">
+          <thead><tr><th style="width:48px">Dia</th><th>Entrada</th><th>Saída</th><th>Intervalo (min)</th><th>VT (R$)</th><th style="text-align:right">H/dia</th></tr></thead>
+          <tbody id="escala-edit-body"></tbody>
+        </table>
+      </div>
+      <div class="save-row" style="margin-top:16px">
+        <button class="btn btn-primary" onclick="salvarEdicao()">Salvar alterações</button>
+        <span class="save-msg" id="e-ok">✓ Salvo no Google Sheets</span>
+      </div>
+    </div>
+  </div>
+
+  <main class="main">
+
+    <!-- FUNCIONÁRIOS -->
+    <div class="page active" id="page-funcionarios">
+      <div class="page-header"><h2>Funcionários</h2><p>Cadastre horário e VT de cada dia da semana individualmente</p></div>
+      <div class="card">
+        <div class="card-title">Novo funcionário</div>
+        <div class="form-row cols-2">
+          <div class="form-group"><label>Nome completo</label><input type="text" id="f-nome" placeholder="Ex: João Silva"></div>
+          <div class="form-group"><label>Cargo / função</label><input type="text" id="f-cargo" placeholder="Ex: Atendente"></div>
+        </div>
+        <div class="sep"></div>
+        <div class="section-label">Escala semanal — horário e VT por dia</div>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Preencha entrada, saída, intervalo e VT de cada dia. Dias sem entrada são considerados <strong style="font-weight:600">folga</strong> automaticamente.</p>
+
+        <div class="table-wrap">
+          <table class="escala-table" id="escala-cadastro">
+            <thead>
+              <tr>
+                <th style="width:48px">Dia</th>
+                <th>Entrada</th>
+                <th>Saída</th>
+                <th>Intervalo (min)</th>
+                <th>VT (R$)</th>
+                <th style="text-align:right">H/dia</th>
+              </tr>
+            </thead>
+            <tbody id="escala-body"></tbody>
+          </table>
+        </div>
+
+        <div class="save-row" style="margin-top:16px">
+          <button class="btn btn-primary" onclick="cadastrarFunc()">Cadastrar funcionário</button>
+          <span class="save-msg" id="f-ok">✓ Salvo no Google Sheets</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Equipe cadastrada</div>
+        <div id="lista-funcs"><div class="empty">Nenhum funcionário cadastrado ainda.</div></div>
+      </div>
+    </div>
+
+    <!-- PONTO -->
+    <div class="page" id="page-ponto">
+      <div class="page-header"><h2>Ponto do dia</h2><p>Marque o status de cada colaborador — horários já definidos na escala</p></div>
+      <div class="card">
+        <div class="form-row cols-2" style="margin-bottom:0">
+          <div class="form-group" style="margin:0"><label>Data</label><input type="date" id="p-data" onchange="renderPonto()"></div>
+          <div style="padding-top:22px;font-size:13px;color:var(--text2)" id="p-diasemana"></div>
+        </div>
+      </div>
+      <div id="ponto-lista"><div class="empty">Selecione uma data.</div></div>
+      <div class="save-row" style="margin-top:4px">
+        <button class="btn btn-primary" onclick="salvarPonto()">Salvar ponto do dia</button>
+        <span class="save-msg" id="p-ok">✓ Salvo no Google Sheets</span>
+      </div>
+    </div>
+
+    <!-- COMISSÃO -->
+    <div class="page" id="page-comissao">
+      <div class="page-header"><h2>Comissão</h2><p>Informe o valor do fechamento e divida entre quem trabalhou</p></div>
+      <div class="card">
+        <div class="form-row cols-2" style="margin-bottom:0">
+          <div class="form-group" style="margin:0"><label>Data</label><input type="date" id="c-data" onchange="renderComissao()"></div>
+          <div class="form-group" style="margin:0"><label>Valor total do fechamento (R$)</label><input type="number" id="c-valor" placeholder="0,00" step="0.01" oninput="calcComissao()"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Divisão da comissão</div>
+        <div class="com-info-bar" id="c-info-bar"></div>
+        <div id="c-lista"><div class="empty">Selecione uma data.</div></div>
+      </div>
+      <div class="save-row">
+        <button class="btn btn-primary" onclick="salvarComissao()">Salvar comissão do dia</button>
+        <span class="save-msg" id="c-ok">✓ Salvo no Google Sheets</span>
+      </div>
+    </div>
+
+    <!-- RESUMO -->
+    <div class="page" id="page-resumo">
+      <div class="page-header"><h2>Resumo mensal</h2><p>Totais para envio ao contador e controle interno</p></div>
+      <div class="card">
+        <div class="filter-row" style="margin-bottom:0">
+          <div class="form-group" style="margin:0"><label>Mês de referência</label><input type="month" id="r-mes" onchange="calcResumo()"></div>
+          <button class="btn" onclick="carregar()" style="margin-top:auto">↻ Atualizar dados</button>
+          <button class="btn btn-primary" onclick="exportarContador()" style="margin-top:auto">↓ Exportar para o contador</button>
+        </div>
+      </div>
+
+      <!-- BLOCO CONTADOR -->
+      <div class="card" id="bloco-contador" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <div>
+            <div class="card-title" style="margin-bottom:2px">Relatório para o contador</div>
+            <div id="r-mes-label" style="font-size:13px;color:var(--text2)"></div>
+          </div>
+          <button class="btn btn-sm" onclick="imprimirContador()">Imprimir / Salvar PDF</button>
+        </div>
+        <div class="table-wrap">
+          <table id="tabela-contador">
+            <thead>
+              <tr>
+                <th>Funcionário</th>
+                <th>Dias trabalhados</th>
+                <th>Faltas</th>
+                <th>H. totais</th>
+                <th style="background:#FEF3C7;color:#92400E">H. noturnas (após 22h)</th>
+                <th style="background:#E8F5EE;color:#1B4332">VT total devido</th>
+                <th>Comissão</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-contador"></tbody>
+            <tfoot id="tfoot-contador"></tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- MÉTRICAS GERAIS -->
+      <div class="metrics" id="r-metrics"></div>
+
+      <!-- DETALHAMENTO COMPLETO -->
+      <div class="card" id="r-tabela"><div class="empty">Selecione um mês.</div></div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const API = 'https://script.google.com/macros/s/AKfycbz3NrqrPoZ9LK6sgZvOHaw9d2g0FFlxWL-QwHhXLpeiTWWAv3mc9kVyNT4EyzEc3w/exec';
+const DIAS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+
+const fmt = n => 'R$ ' + Number(n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtH = h => { const t=Math.round((h||0)*60); return `${Math.floor(t/60)}h${String(t%60).padStart(2,'0')}m`; };
+
+let DB = { funcs:[], ponto:{}, comissao:{} };
+let saving = false;
+
+function setSyncStatus(s, msg) {
+  document.getElementById('sync-dot').className='sync-dot'+(s==='loading'?' loading':s==='error'?' error':'');
+  document.getElementById('sync-msg').textContent=msg;
+}
+
+async function carregar() {
+  setSyncStatus('loading','Carregando...');
+  try {
+    const r = await fetch(API+'?t='+Date.now());
+    const data = await r.json();
+    DB = data;
+    if(!DB.funcs) DB.funcs=[];
+    if(!DB.ponto) DB.ponto={};
+    if(!DB.comissao) DB.comissao={};
+    setSyncStatus('ok','Sincronizado · '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
+    renderFuncs(); populateRSelect();
+  } catch(e) { setSyncStatus('error','Erro de conexão'); }
+}
+
+async function salvarDados(okId) {
+  if(saving) return; saving=true;
+  setSyncStatus('loading','Salvando...');
+  try {
+    await fetch(API,{method:'POST',body:JSON.stringify(DB)});
+    setSyncStatus('ok','Salvo · '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
+    if(okId){const el=document.getElementById(okId);el.style.display='inline';setTimeout(()=>el.style.display='none',3000);}
+  } catch(e){ setSyncStatus('error','Erro ao salvar'); }
+  saving=false;
+}
+
+function goPage(id, btn) {
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('page-'+id).classList.add('active');
+  if(id==='ponto') renderPonto();
+  if(id==='comissao') renderComissao();
+  if(id==='resumo'){populateRSelect();calcResumo();}
+}
+
+// Monta a tabela de escala no cadastro
+function buildEscalaBody() {
+  const defaults = [
+    {en:'08:00',sa:'18:00',iv:60,vt:0}, // Dom
+    {en:'08:00',sa:'18:00',iv:60,vt:0}, // Seg
+    {en:'08:00',sa:'18:00',iv:60,vt:0}, // Ter
+    {en:'08:00',sa:'18:00',iv:60,vt:0}, // Qua
+    {en:'08:00',sa:'18:00',iv:60,vt:0}, // Qui
+    {en:'08:00',sa:'18:00',iv:60,vt:0}, // Sex
+    {en:'08:00',sa:'18:00',iv:60,vt:0}, // Sáb
+  ];
+  const tbody = document.getElementById('escala-body');
+  tbody.innerHTML = '';
+  DIAS.forEach((dia,i) => {
+    const d = defaults[i];
+    const tr = document.createElement('tr');
+    tr.id = 'erow-'+i;
+    tr.innerHTML = `
+      <td><span class="dia-label">${dia}</span></td>
+      <td><input type="time" id="en-c${i}" value="${d.en}" oninput="atualizarHorasLinha(${i})"></td>
+      <td><input type="time" id="sa-c${i}" value="${d.sa}" oninput="atualizarHorasLinha(${i})"></td>
+      <td><input type="number" id="iv-c${i}" value="${d.iv}" min="0" max="480" oninput="atualizarHorasLinha(${i})"></td>
+      <td><input type="number" id="vt-c${i}" value="${d.vt||''}" placeholder="0" step="0.01" min="0" oninput="atualizarHorasLinha(${i})"></td>
+      <td class="horas-calc" id="hc-${i}">—</td>
+    `;
+    tbody.appendChild(tr);
+    atualizarHorasLinha(i);
+  });
+}
+
+function atualizarHorasLinha(dia) {
+  const en=document.getElementById('en-c'+dia)?.value;
+  const sa=document.getElementById('sa-c'+dia)?.value;
+  const iv=parseInt(document.getElementById('iv-c'+dia)?.value)||0;
+  const vt=parseFloat(document.getElementById('vt-c'+dia)?.value)||0;
+  const hc=document.getElementById('hc-'+dia);
+  const row=document.getElementById('erow-'+dia);
+  if(!en||!sa){
+    if(hc) hc.textContent='folga';
+    if(row) row.classList.add('folga-row');
+    return;
+  }
+  if(row) row.classList.remove('folga-row');
+  const {horas}=calcHorasFixas(en,sa,iv);
+  if(hc) hc.textContent=fmtH(horas);
+}
+
+function getDiaEscala(idx) {
+  return {
+    entrada: document.getElementById('en-c'+idx)?.value||'',
+    saida:   document.getElementById('sa-c'+idx)?.value||'',
+    intervalo: parseInt(document.getElementById('iv-c'+idx)?.value)||0,
+    vt:      parseFloat(document.getElementById('vt-c'+idx)?.value)||0,
+  };
+}
+
+function calcHorasFixas(entrada, saida, intervalo) {
+  if(!entrada||!saida) return {horas:0,noturnas:0};
+  const [eh,em]=entrada.split(':').map(Number);
+  const [sh,sm]=saida.split(':').map(Number);
+  let tot=(sh*60+sm)-(eh*60+em)-intervalo;
+  if(tot<0) tot+=1440; tot=Math.max(0,tot);
+  let not=0; const eM=eh*60+em; let sM=sh*60+sm; if(sM<=eM) sM+=1440;
+  for(let m=eM;m<sM-intervalo;m++){const mm=m%1440;if(mm>=1320||mm<300)not++;}
+  return {horas:tot/60, noturnas:not/60};
+}
+
+function getEscalaDia(f, dataStr) {
+  // retorna a escala do dia da semana correspondente
+  const dow = new Date(dataStr+'T12:00').getDay();
+  const dia = f.escala[dow];
+  return dia || {entrada:'',saida:'',intervalo:60,vt:0};
+}
+
+function isFolga(f, dataStr) {
+  const d = getEscalaDia(f, dataStr);
+  return !d.entrada || !d.saida;
+}
+
+async function cadastrarFunc() {
+  const nome=document.getElementById('f-nome').value.trim();
+  if(!nome){alert('Informe o nome.');return;}
+  const escala={};
+  DIAS.forEach((_,i)=>{ escala[i]=getDiaEscala(i); });
+  DB.funcs.push({id:Date.now(), nome, cargo:document.getElementById('f-cargo').value.trim(), escala});
+  await salvarDados('f-ok');
+  renderFuncs(); populateRSelect();
+  document.getElementById('f-nome').value='';
+  document.getElementById('f-cargo').value='';
+  buildEscalaBody();
+}
+
+function renderFuncs() {
+  const el=document.getElementById('lista-funcs');
+  if(!DB.funcs.length){el.innerHTML='<div class="empty">Nenhum funcionário cadastrado ainda.</div>';return;}
+  el.innerHTML='<div class="table-wrap"><table><thead><tr><th>Nome</th><th>Cargo</th>'+
+    DIAS.map(d=>`<th style="text-align:center">${d}</th>`).join('')+
+    '<th></th></tr></thead><tbody>'+
+    DB.funcs.map(f=>{
+      const cols=DIAS.map((_,i)=>{
+        const d=f.escala[i];
+        if(!d||!d.entrada) return `<td style="text-align:center"><span class="badge badge-amber">folga</span></td>`;
+        const {horas}=calcHorasFixas(d.entrada,d.saida,d.intervalo);
+        return `<td style="text-align:center;font-size:11px;line-height:1.7">
+          <span style="font-family:'DM Mono',monospace;display:block">${d.entrada}–${d.saida}</span>
+          <span style="color:var(--text3)">${fmtH(horas)}</span>
+          ${d.vt>0?`<span style="color:var(--accent-text);display:block">${fmt(d.vt)}</span>`:''}
+        </td>`;
+      }).join('');
+      return `<tr><td style="font-weight:600;white-space:nowrap">${f.nome}</td><td style="color:var(--text2)">${f.cargo||'—'}</td>${cols}<td style="white-space:nowrap;display:flex;gap:6px;padding:10px 12px"><button class="btn btn-sm" onclick="abrirEdicao(${f.id})">Editar</button><button class="btn btn-sm btn-danger" onclick="remFunc(${f.id})">Remover</button></td></tr>`;
+    }).join('')+'</tbody></table></div>';
+}
+
+async function remFunc(id){
+  if(!confirm('Remover funcionário?'))return;
+  DB.funcs=DB.funcs.filter(f=>f.id!==id);
+  await salvarDados();renderFuncs();populateRSelect();
+}
+
+let editandoId = null;
+
+function abrirEdicao(id) {
+  const f = DB.funcs.find(f=>f.id===id);
+  if(!f) return;
+  editandoId = id;
+  document.getElementById('e-nome').value = f.nome;
+  document.getElementById('e-cargo').value = f.cargo||'';
+  // monta escala no modal
+  const tbody = document.getElementById('escala-edit-body');
+  tbody.innerHTML = '';
+  DIAS.forEach((dia,i)=>{
+    const d = f.escala[i]||{entrada:'',saida:'',intervalo:60,vt:0};
+    const tr = document.createElement('tr');
+    tr.id = 'erow-e'+i;
+    tr.innerHTML = `
+      <td><span class="dia-label">${dia}</span></td>
+      <td><input type="time" id="en-e${i}" value="${d.entrada}" oninput="atualizarHorasLinhaEdit(${i})"></td>
+      <td><input type="time" id="sa-e${i}" value="${d.saida}" oninput="atualizarHorasLinhaEdit(${i})"></td>
+      <td><input type="number" id="iv-e${i}" value="${d.intervalo}" min="0" max="480" oninput="atualizarHorasLinhaEdit(${i})"></td>
+      <td><input type="number" id="vt-e${i}" value="${d.vt||''}" placeholder="0" step="0.01" min="0"></td>
+      <td class="horas-calc" id="hce-${i}">—</td>`;
+    tbody.appendChild(tr);
+    atualizarHorasLinhaEdit(i);
+  });
+  const overlay = document.getElementById('modal-overlay');
+  overlay.style.display = 'flex';
+}
+
+function atualizarHorasLinhaEdit(dia) {
+  const en=document.getElementById('en-e'+dia)?.value;
+  const sa=document.getElementById('sa-e'+dia)?.value;
+  const iv=parseInt(document.getElementById('iv-e'+dia)?.value)||0;
+  const hc=document.getElementById('hce-'+dia);
+  const row=document.getElementById('erow-e'+dia);
+  if(!en||!sa){if(hc)hc.textContent='folga';if(row)row.classList.add('folga-row');return;}
+  if(row)row.classList.remove('folga-row');
+  const {horas}=calcHorasFixas(en,sa,iv);
+  if(hc)hc.textContent=fmtH(horas);
+}
+
+function fecharModal() {
+  document.getElementById('modal-overlay').style.display='none';
+  editandoId=null;
+}
+
+async function salvarEdicao() {
+  if(!editandoId) return;
+  const idx = DB.funcs.findIndex(f=>f.id===editandoId);
+  if(idx===-1) return;
+  const escala={};
+  DIAS.forEach((_,i)=>{
+    escala[i]={
+      entrada: document.getElementById('en-e'+i)?.value||'',
+      saida:   document.getElementById('sa-e'+i)?.value||'',
+      intervalo: parseInt(document.getElementById('iv-e'+i)?.value)||0,
+      vt:      parseFloat(document.getElementById('vt-e'+i)?.value)||0,
+    };
+  });
+  DB.funcs[idx] = {
+    ...DB.funcs[idx],
+    nome: document.getElementById('e-nome').value.trim()||DB.funcs[idx].nome,
+    cargo: document.getElementById('e-cargo').value.trim(),
+    escala,
+  };
+  await salvarDados('e-ok');
+  renderFuncs(); populateRSelect();
+  setTimeout(fecharModal, 1500);
+}
+
+// PONTO
+function renderPonto() {
+  const data=document.getElementById('p-data').value;
+  const dsEl=document.getElementById('p-diasemana');
+  if(!data){document.getElementById('ponto-lista').innerHTML='<div class="empty">Selecione uma data.</div>';dsEl.textContent='';return;}
+  const d=new Date(data+'T12:00');
+  dsEl.textContent=DIAS[d.getDay()]+', '+d.toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
+  const hoje=DB.ponto[data]||{};
+  if(!DB.funcs.length){document.getElementById('ponto-lista').innerHTML='<div class="card"><div class="empty">Cadastre funcionários primeiro.</div></div>';return;}
+
+  let html='<div class="card"><div class="ponto-grid">';
+  DB.funcs.forEach(f=>{
+    const folga=isFolga(f,data);
+    const reg=hoje[f.id]||{};
+    const status=reg.status||(folga?'folga':'trabalhou');
+    const esc=getEscalaDia(f,data);
+    const {horas,noturnas}=!folga?calcHorasFixas(esc.entrada,esc.saida,esc.intervalo):{horas:0,noturnas:0};
+    const horarioStr=!folga?`${esc.entrada} → ${esc.saida} · ${fmtH(horas)}${noturnas>0?' · '+fmtH(noturnas)+' not.':''}` : 'folga na escala';
+    const vtStr=!folga&&esc.vt>0?`VT: ${fmt(esc.vt)}`:(folga?'':'sem VT');
+    html+=`<div class="ponto-card ${status}" id="pc-${f.id}">
+      <div class="ponto-info">
+        <div class="ponto-nome">${f.nome}</div>
+        <div class="ponto-horario">${horarioStr}</div>
+        ${vtStr?`<div class="ponto-vt">${vtStr}</div>`:''}
+      </div>
+      <div class="ponto-select">
+        <select id="st-${f.id}" onchange="atualizarCardPonto(${f.id})">
+          <option value="trabalhou" ${status==='trabalhou'?'selected':''}>Trabalhou</option>
+          <option value="folga" ${status==='folga'?'selected':''}>Folga</option>
+          <option value="falta" ${status==='falta'?'selected':''}>Falta</option>
+        </select>
+      </div>
+    </div>`;
+  });
+  html+='</div></div>';
+  document.getElementById('ponto-lista').innerHTML=html;
+}
+
+function atualizarCardPonto(fid){
+  const st=document.getElementById('st-'+fid).value;
+  document.getElementById('pc-'+fid).className='ponto-card '+st;
+}
+
+async function salvarPonto(){
+  const data=document.getElementById('p-data').value;
+  if(!data){alert('Selecione a data.');return;}
+  if(!DB.ponto[data]) DB.ponto[data]={};
+  DB.funcs.forEach(f=>{
+    const st=document.getElementById('st-'+f.id);if(!st)return;
+    const status=st.value;
+    const esc=getEscalaDia(f,data);
+    const {horas,noturnas}=status==='trabalhou'?calcHorasFixas(esc.entrada,esc.saida,esc.intervalo):{horas:0,noturnas:0};
+    DB.ponto[data][f.id]={status,horas,noturnas,vt:status==='trabalhou'?esc.vt:0};
+  });
+  await salvarDados('p-ok');
+}
+
+// COMISSÃO
+function renderComissao(){
+  const data=document.getElementById('c-data').value;
+  if(!data){document.getElementById('c-lista').innerHTML='<div class="empty">Selecione uma data.</div>';return;}
+  const ph=DB.ponto[data]||{},ch=DB.comissao[data]||{};
+  let html='';
+  DB.funcs.forEach(f=>{
+    const p=ph[f.id],trab=p?p.status==='trabalhou':!isFolga(f,data);
+    const checked=ch[f.id]!==undefined?ch[f.id].incluir:trab;
+    html+=`<div class="com-row">
+      <input type="checkbox" id="cc-${f.id}" ${checked?'checked':''} onchange="calcComissao()">
+      <span class="com-nome">${f.nome} <span class="badge ${trab?'badge-green':'badge-amber'}" style="margin-left:6px">${trab?'Trabalhou':'Folga/Falta'}</span></span>
+      <span class="com-valor" id="cv-${f.id}">—</span>
+    </div>`;
+  });
+  document.getElementById('c-lista').innerHTML=html||'<div class="empty">Cadastre funcionários.</div>';
+  if(ch._total) document.getElementById('c-valor').value=ch._total;
+  calcComissao();
+}
+
+function calcComissao(){
+  const total=parseFloat(document.getElementById('c-valor').value)||0;
+  const on=DB.funcs.filter(f=>document.getElementById('cc-'+f.id)?.checked);
+  const n=on.length,parte=n>0?total/n:0;
+  const bar=document.getElementById('c-info-bar');
+  if(n>0&&total>0){bar.style.display='block';bar.textContent=`${n} funcionário${n>1?'s':''} — ${fmt(parte)} cada`;}
+  else bar.style.display='none';
+  DB.funcs.forEach(f=>{const el=document.getElementById('cv-'+f.id);if(!el)return;el.textContent=document.getElementById('cc-'+f.id)?.checked?fmt(parte):'—';});
+}
+
+async function salvarComissao(){
+  const data=document.getElementById('c-data').value;
+  if(!data){alert('Selecione a data.');return;}
+  const total=parseFloat(document.getElementById('c-valor').value)||0;
+  const on=DB.funcs.filter(f=>document.getElementById('cc-'+f.id)?.checked);
+  const parte=on.length>0?total/on.length:0;
+  DB.comissao[data]={_total:total};
+  DB.funcs.forEach(f=>{const inc=!!document.getElementById('cc-'+f.id)?.checked;DB.comissao[data][f.id]={incluir:inc,valor:inc?parte:0};});
+  await salvarDados('c-ok');
+}
+
+// RESUMO
+function populateRSelect(){
+  const el=document.getElementById('r-func');const v=el.value;
+  el.innerHTML='<option value="">Todos</option>'+DB.funcs.map(f=>`<option value="${f.id}">${f.nome}</option>`).join('');
+  el.value=v;
+}
+
+function calcResumo(){
+  const mes=document.getElementById('r-mes').value;
+  const funcs=DB.funcs;
+  let tH=0,tN=0,tV=0,tC=0;
+  const rows=funcs.map(f=>{
+    let h=0,n=0,v=0,c=0,dt=0,df=0,dfa=0;
+    Object.keys(DB.ponto).forEach(d=>{
+      if(mes&&!d.startsWith(mes))return;
+      const p=(DB.ponto[d]||{})[f.id];if(!p)return;
+      if(p.status==='trabalhou'){dt++;h+=p.horas||0;n+=p.noturnas||0;v+=p.vt||0;}
+      else if(p.status==='folga')df++;else dfa++;
+    });
+    Object.keys(DB.comissao).forEach(d=>{
+      if(mes&&!d.startsWith(mes))return;
+      const cc=(DB.comissao[d]||{})[f.id];if(cc&&cc.incluir)c+=cc.valor||0;
+    });
+    tH+=h;tN+=n;tV+=v;tC+=c;
+    return {f,dt,df,dfa,h,n,v,c};
+  });
+
+  document.getElementById('r-metrics').innerHTML=`
+    <div class="metric"><div class="metric-label">Total horas</div><div class="metric-value">${fmtH(tH)}</div></div>
+    <div class="metric"><div class="metric-label">H. noturnas</div><div class="metric-value">${fmtH(tN)}</div></div>
+    <div class="metric"><div class="metric-label">Total VT</div><div class="metric-value">${fmt(tV)}</div></div>
+    <div class="metric"><div class="metric-label">Comissões</div><div class="metric-value">${fmt(tC)}</div></div>`;
+
+  document.getElementById('r-tabela').innerHTML=rows.length?`
+    <div class="card-title">Detalhamento completo por funcionário</div>
+    <div class="table-wrap"><table>
+    <thead><tr><th>Funcionário</th><th>Dias trab.</th><th>Folgas</th><th>Faltas</th><th>H. totais</th><th>H. noturnas</th><th>VT total</th><th>Comissão</th></tr></thead>
+    <tbody>`+rows.map(r=>`<tr>
+      <td style="font-weight:600">${r.f.nome}</td>
+      <td>${r.dt}</td><td>${r.df}</td><td>${r.dfa}</td>
+      <td style="font-family:'DM Mono',monospace">${fmtH(r.h)}</td>
+      <td style="font-family:'DM Mono',monospace;color:var(--warn);font-weight:500">${fmtH(r.n)}</td>
+      <td style="font-family:'DM Mono',monospace;color:var(--accent-text);font-weight:500">${fmt(r.v)}</td>
+      <td style="font-family:'DM Mono',monospace;font-weight:600;color:var(--accent)">${fmt(r.c)}</td>
+    </tr>`).join('')+'</tbody></table></div>':
+    '<div class="empty">Sem dados para o período selecionado.</div>';
+
+  // oculta bloco contador ao recalcular
+  document.getElementById('bloco-contador').style.display='none';
+}
+
+function exportarContador() {
+  const mes=document.getElementById('r-mes').value;
+  if(!mes){alert('Selecione um mês primeiro.');return;}
+  const funcs=DB.funcs;
+  const rows=funcs.map(f=>{
+    let h=0,n=0,v=0,c=0,dt=0,dfa=0;
+    Object.keys(DB.ponto).forEach(d=>{
+      if(!d.startsWith(mes))return;
+      const p=(DB.ponto[d]||{})[f.id];if(!p)return;
+      if(p.status==='trabalhou'){dt++;h+=p.horas||0;n+=p.noturnas||0;v+=p.vt||0;}
+      else if(p.status==='falta')dfa++;
+    });
+    Object.keys(DB.comissao).forEach(d=>{
+      if(!d.startsWith(mes))return;
+      const cc=(DB.comissao[d]||{})[f.id];if(cc&&cc.incluir)c+=cc.valor||0;
+    });
+    return {f,dt,dfa,h,n,v,c};
+  });
+
+  // label do mês
+  const [ano,m]=mes.split('-');
+  const nomeMes=new Date(ano,parseInt(m)-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+  document.getElementById('r-mes-label').textContent='Competência: '+nomeMes.charAt(0).toUpperCase()+nomeMes.slice(1);
+
+  let tH=0,tN=0,tV=0,tC=0,tDt=0,tDfa=0;
+  document.getElementById('tbody-contador').innerHTML=rows.map(r=>{
+    tH+=r.h;tN+=r.n;tV+=r.v;tC+=r.c;tDt+=r.dt;tDfa+=r.dfa;
+    return `<tr>
+      <td style="font-weight:600">${r.f.nome}</td>
+      <td style="text-align:center">${r.dt}</td>
+      <td style="text-align:center;color:${r.dfa>0?'var(--danger)':'inherit'}">${r.dfa}</td>
+      <td style="font-family:'DM Mono',monospace;text-align:right">${fmtH(r.h)}</td>
+      <td style="font-family:'DM Mono',monospace;text-align:right;color:var(--warn);font-weight:600;background:#FFFBEB">${fmtH(r.n)}</td>
+      <td style="font-family:'DM Mono',monospace;text-align:right;color:var(--accent-text);font-weight:600;background:#F0FDF4">${fmt(r.v)}</td>
+      <td style="font-family:'DM Mono',monospace;text-align:right">${fmt(r.c)}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('tfoot-contador').innerHTML=`<tr style="border-top:2px solid var(--border);font-weight:600;background:var(--surface2)">
+    <td>Total</td>
+    <td style="text-align:center">${tDt}</td>
+    <td style="text-align:center">${tDfa}</td>
+    <td style="font-family:'DM Mono',monospace;text-align:right">${fmtH(tH)}</td>
+    <td style="font-family:'DM Mono',monospace;text-align:right;color:var(--warn);background:#FFFBEB">${fmtH(tN)}</td>
+    <td style="font-family:'DM Mono',monospace;text-align:right;color:var(--accent-text);background:#F0FDF4">${fmt(tV)}</td>
+    <td style="font-family:'DM Mono',monospace;text-align:right">${fmt(tC)}</td>
+  </tr>`;
+
+  document.getElementById('bloco-contador').style.display='block';
+  document.getElementById('bloco-contador').scrollIntoView({behavior:'smooth'});
+}
+
+function imprimirContador(){
+  const conteudo=document.getElementById('bloco-contador').innerHTML;
+  const janela=window.open('','_blank');
+  janela.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+  <title>Relatório Contador</title>
+  <style>
+    body{font-family:Arial,sans-serif;font-size:13px;color:#111;padding:32px;max-width:900px;margin:0 auto}
+    h2{font-size:18px;margin-bottom:4px}
+    p{color:#666;font-size:12px;margin-bottom:20px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th{text-align:left;padding:8px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid #ddd;background:#f5f5f5}
+    td{padding:8px 10px;border-bottom:1px solid #eee}
+    tfoot tr{font-weight:bold;border-top:2px solid #ccc;background:#f9f9f9}
+    .not{background:#FFFBEB;color:#92400E}
+    .vt{background:#F0FDF4;color:#1B4332}
+    @media print{button{display:none}}
+  </style></head><body>
+  <h2>Relatório mensal — RH</h2>
+  <p>${document.getElementById('r-mes-label').textContent} · Gerado em ${new Date().toLocaleDateString('pt-BR')}</p>
+  <table>
+    <thead><tr><th>Funcionário</th><th>Dias trab.</th><th>Faltas</th><th>H. totais</th><th class="not">H. noturnas (após 22h)</th><th class="vt">VT total devido</th><th>Comissão</th></tr></thead>
+    <tbody>${document.getElementById('tbody-contador').innerHTML}</tbody>
+    <tfoot>${document.getElementById('tfoot-contador').innerHTML}</tfoot>
+  </table>
+  <script>window.onload=()=>window.print()<\/script>
+  </body></html>`);
+  janela.document.close();
+}
+
+// INIT
+const hoje=new Date().toISOString().slice(0,10);
+document.getElementById('p-data').value=hoje;
+document.getElementById('c-data').value=hoje;
+document.getElementById('r-mes').value=hoje.slice(0,7);
+buildEscalaBody();
+carregar();
+</script>
+</body>
+</html>
