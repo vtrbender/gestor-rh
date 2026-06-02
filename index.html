@@ -300,7 +300,14 @@
       <div class="page-header"><h2>Comissão</h2><p>Informe o valor do fechamento e divida entre quem trabalhou</p></div>
       <div class="card">
         <div style="display:grid;grid-template-columns:1fr 1fr 120px 1fr;gap:12px;align-items:end">
-          <div class="form-group" style="margin:0"><label>Data</label><input type="date" id="c-data" onchange="renderComissao()"></div>
+          <div class="form-group" style="margin:0">
+            <label>Data</label>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="date" id="c-data" onchange="renderComissao()" style="flex:1">
+              <button class="btn btn-sm" onclick="navegarDiaComissao(-1)" style="padding:7px 8px">◀</button>
+              <button class="btn btn-sm" onclick="navegarDiaComissao(1)" style="padding:7px 8px">▶</button>
+            </div>
+          </div>
           <div class="form-group" style="margin:0"><label>Valor total do fechamento (R$)</label><input type="number" id="c-valor" placeholder="0,00" step="0.01" oninput="calcComissao()"></div>
           <div class="form-group" style="margin:0"><label>Desconto cartão (%)</label><input type="number" id="c-desconto" value="3" step="0.1" min="0" max="100" oninput="calcComissao()"></div>
           <div class="form-group" style="margin:0">
@@ -740,6 +747,19 @@ async function salvarPresenca(){
     const {horas,noturnas}=status==='trabalhou'?calcHorasFixas(esc.entrada,esc.saida,esc.intervalo):{horas:0,noturnas:0};
     DB.ponto[data][f.id]={status,horas,noturnas,vt:status==='trabalhou'?esc.vt:0};
   });
+  // se ja tem comissao lancada neste dia, recalcula automaticamente
+  if(DB.comissao[data]&&DB.comissao[data]._total){
+    const total=DB.comissao[data]._total||0;
+    const desc=DB.comissao[data]._desconto||0;
+    const liquido=total*(1-desc/100);
+    const trabalharam=DB.funcs.filter(f=>(DB.ponto[data][f.id]||{}).status==='trabalhou');
+    const parte=trabalharam.length>0?liquido/trabalharam.length:0;
+    DB.comissao[data]._liquido=liquido;
+    DB.funcs.forEach(f=>{
+      const inc=(DB.ponto[data][f.id]||{}).status==='trabalhou';
+      DB.comissao[data][f.id]={incluir:inc,valor:inc?parte:0};
+    });
+  }
   await salvarDados('pr-ok');
 }
 
@@ -944,6 +964,15 @@ function navegarDia(delta) {
   d.setDate(d.getDate()+delta);
   el.value=d.toISOString().slice(0,10);
   renderPresenca();
+}
+
+function navegarDiaComissao(delta) {
+  const el=document.getElementById('c-data');
+  if(!el) return;
+  const d=new Date((el.value||new Date().toISOString().slice(0,10))+'T12:00');
+  d.setDate(d.getDate()+delta);
+  el.value=d.toISOString().slice(0,10);
+  renderComissao();
 }
 
 // RECALCULAR TODOS OS DIAS
