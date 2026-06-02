@@ -182,6 +182,13 @@
         <div class="form-group"><label>Cargo / função</label><input type="text" id="e-cargo"></div>
       </div>
       <div class="sep"></div>
+      <div class="section-label">Datas e situação</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+        <div class="form-group" style="margin:0"><label>Data de admissão</label><input type="date" id="e-admissao"></div>
+        <div class="form-group" style="margin:0"><label>Início das férias</label><input type="date" id="e-ferias-ini"></div>
+        <div class="form-group" style="margin:0"><label>Fim das férias</label><input type="date" id="e-ferias-fim"></div>
+      </div>
+      <div class="sep"></div>
       <div class="section-label">Escala semanal — horário e VT por dia</div>
       <div class="table-wrap">
         <table class="escala-table">
@@ -247,7 +254,14 @@
           </table>
         </div>
 
-        <div class="save-row" style="margin-top:16px">
+        <div class="sep"></div>
+        <div class="section-label">Datas e situação</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+          <div class="form-group" style="margin:0"><label>Data de admissão</label><input type="date" id="f-admissao"></div>
+          <div class="form-group" style="margin:0"><label>Início das férias</label><input type="date" id="f-ferias-ini"></div>
+          <div class="form-group" style="margin:0"><label>Fim das férias</label><input type="date" id="f-ferias-fim"></div>
+        </div>
+        <div class="save-row" style="margin-top:4px">
           <button class="btn btn-primary" onclick="cadastrarFunc()">Cadastrar funcionário</button>
           <span class="save-msg" id="f-ok">✓ Salvo no Google Sheets</span>
         </div>
@@ -527,16 +541,30 @@ function isFolga(f, dataStr) {
   return !d.entrada || !d.saida;
 }
 
+function statusFuncNaData(f, data) {
+  if(f.admissao && data < f.admissao) return 'antes_admissao';
+  if(f.feriasIni && f.feriasFim && data >= f.feriasIni && data <= f.feriasFim) return 'ferias';
+  return 'normal';
+}
+
 async function cadastrarFunc() {
   const nome=document.getElementById('f-nome').value.trim();
   if(!nome){alert('Informe o nome.');return;}
   const escala={};
   DIAS.forEach((_,i)=>{ escala[i]=getDiaEscala(i); });
-  DB.funcs.push({id:Date.now(), nome, cargo:document.getElementById('f-cargo').value.trim(), escala});
+  DB.funcs.push({
+    id:Date.now(), nome, cargo:document.getElementById('f-cargo').value.trim(), escala,
+    admissao: document.getElementById('f-admissao').value||'',
+    feriasIni: document.getElementById('f-ferias-ini').value||'',
+    feriasFim: document.getElementById('f-ferias-fim').value||'',
+  });
   await salvarDados('f-ok');
   renderFuncs(); populateRSelect();
   document.getElementById('f-nome').value='';
   document.getElementById('f-cargo').value='';
+  document.getElementById('f-admissao').value='';
+  document.getElementById('f-ferias-ini').value='';
+  document.getElementById('f-ferias-fim').value='';
   buildEscalaBody();
 }
 
@@ -550,10 +578,12 @@ function renderFuncs() {
   function linhaFunc(f) {
     const vtStr=DIAS.map((d,i)=>{const dia=f.escala&&f.escala[i];return dia&&dia.vt>0?`<span style="font-size:11px;color:var(--text2)">${DIAS[i]} <b style="font-family:'DM Mono',monospace;font-weight:500;color:var(--text)">${fmt(dia.vt)}</b></span>`:null;}).filter(Boolean).join(' &ensp;');
     const folgas=DIAS.filter((d,i)=>!f.escala||!f.escala[i]||!f.escala[i].entrada).join(', ');
+    const admissaoStr=f.admissao?`<span style="font-size:11px;color:var(--text3)">desde ${new Date(f.admissao+'T12:00').toLocaleDateString('pt-BR')}</span>`:'';
+    const feriasStr=f.feriasIni&&f.feriasFim?`<span class="badge" style="background:#E0F2FE;color:#0369A1;margin-left:4px">🏖 Férias ${new Date(f.feriasIni+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}–${new Date(f.feriasFim+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</span>`:'';
     if(f.arquivado){
-      return `<tr style="opacity:.55"><td style="font-weight:600;white-space:nowrap">${f.nome}</td><td style="color:var(--text2)">${f.cargo||'—'}</td><td colspan="2"><span class="badge badge-amber">Arquivado</span></td><td style="white-space:nowrap"><button class="btn btn-sm" onclick="desarquivarFunc(${f.id})">Reativar</button> <button class="btn btn-sm btn-danger" onclick="remFunc(${f.id})">Remover</button></td></tr>`;
+      return `<tr style="opacity:.55"><td style="font-weight:600;white-space:nowrap">${f.nome} ${admissaoStr}</td><td style="color:var(--text2)">${f.cargo||'—'}</td><td colspan="2"><span class="badge badge-amber">Arquivado</span></td><td style="white-space:nowrap"><button class="btn btn-sm" onclick="desarquivarFunc(${f.id})">Reativar</button> <button class="btn btn-sm btn-danger" onclick="remFunc(${f.id})">Remover</button></td></tr>`;
     }
-    return `<tr><td style="font-weight:600;white-space:nowrap">${f.nome}</td><td style="color:var(--text2)">${f.cargo||'—'}</td><td style="line-height:2">${vtStr||'—'}</td><td><span class="badge badge-amber">${folgas||'Nenhuma'}</span></td><td style="white-space:nowrap;display:flex;gap:6px;padding:10px 12px"><button class="btn btn-sm" onclick="abrirEdicao(${f.id})">Editar</button><button class="btn btn-sm" onclick="arquivarFunc(${f.id})" style="color:var(--warn);border-color:#FDE68A;background:#FFFBEB">Arquivar</button><button class="btn btn-sm btn-danger" onclick="remFunc(${f.id})">Remover</button></td></tr>`;
+    return `<tr><td style="font-weight:600;white-space:nowrap">${f.nome}<br>${admissaoStr}${feriasStr}</td><td style="color:var(--text2)">${f.cargo||'—'}</td><td style="line-height:2">${vtStr||'—'}</td><td><span class="badge badge-amber">${folgas||'Nenhuma'}</span></td><td style="white-space:nowrap;display:flex;gap:6px;padding:10px 12px"><button class="btn btn-sm" onclick="abrirEdicao(${f.id})">Editar</button><button class="btn btn-sm" onclick="arquivarFunc(${f.id})" style="color:var(--warn);border-color:#FDE68A;background:#FFFBEB">Arquivar</button><button class="btn btn-sm btn-danger" onclick="remFunc(${f.id})">Remover</button></td></tr>`;
   }
 
   let html='<div class="table-wrap"><table><thead><tr>'+DIAS.map(d=>`<th style="text-align:center">${d}</th>`).join('')+'</tr></thead>';
@@ -594,6 +624,9 @@ function abrirEdicao(id) {
   editandoId = id;
   document.getElementById('e-nome').value = f.nome;
   document.getElementById('e-cargo').value = f.cargo||'';
+  document.getElementById('e-admissao').value = f.admissao||'';
+  document.getElementById('e-ferias-ini').value = f.feriasIni||'';
+  document.getElementById('e-ferias-fim').value = f.feriasFim||'';
   // monta escala no modal
   const tbody = document.getElementById('escala-edit-body');
   tbody.innerHTML = '';
@@ -650,6 +683,9 @@ async function salvarEdicao() {
     nome: document.getElementById('e-nome').value.trim()||DB.funcs[idx].nome,
     cargo: document.getElementById('e-cargo').value.trim(),
     escala,
+    admissao: document.getElementById('e-admissao').value||'',
+    feriasIni: document.getElementById('e-ferias-ini').value||'',
+    feriasFim: document.getElementById('e-ferias-fim').value||'',
   };
   await salvarDados('e-ok');
   renderFuncs(); populateRSelect();
@@ -725,14 +761,19 @@ function renderPresenca() {
   if(!funcsAtivos.length){document.getElementById('presenca-lista').innerHTML='<div class="card"><div class="empty">Cadastre funcionários primeiro.</div></div>';return;}
   let html='<div class="card"><div class="ponto-grid">';
   funcsAtivos.forEach(f=>{
+    const sf=statusFuncNaData(f,data);
+    if(sf==='antes_admissao') return; // não mostra antes da admissão
     const folga=isFolga(f,data);
     const reg=hoje[f.id]||{};
-    const status=reg.status||(folga?'folga':'trabalhou');
+    const isFerias=sf==='ferias';
+    const status=reg.status||(isFerias?'ferias':folga?'folga':'trabalhou');
     const esc=getEscalaDia(f,data);
-    const {horas,noturnas}=!folga?calcHorasFixas(esc.entrada,esc.saida,esc.intervalo):{horas:0,noturnas:0};
-    const horarioStr=!folga?`${esc.entrada} → ${esc.saida} · ${fmtH(horas)}${noturnas>0?' · '+fmtH(noturnas)+' not.':''}` : 'folga na escala';
-    const vtStr=!folga&&esc.vt>0?`VT: ${fmt(esc.vt)}`:(folga?'':'sem VT');
-    html+=`<div class="ponto-card ${status}" id="prc-${f.id}">
+    const {horas,noturnas}=status==='trabalhou'?calcHorasFixas(esc.entrada,esc.saida,esc.intervalo):{horas:0,noturnas:0};
+    const horarioStr=status==='ferias'?'🏖 Férias':!folga?`${esc.entrada} → ${esc.saida} · ${fmtH(horas)}${noturnas>0?' · '+fmtH(noturnas)+' not.':''}` : 'folga na escala';
+    const vtStr=status==='trabalhou'&&esc.vt>0?`VT: ${fmt(esc.vt)}`:'';
+    const cardClass=status==='ferias'?'ponto-card' : `ponto-card ${status}`;
+    const cardStyle=status==='ferias'?'border-color:#BAE6FD;background:#F0F9FF':'';
+    html+=`<div class="${cardClass}" id="prc-${f.id}" style="${cardStyle}">
       <div class="ponto-info">
         <div class="ponto-nome">${f.nome}</div>
         <div class="ponto-horario">${horarioStr}</div>
@@ -743,6 +784,7 @@ function renderPresenca() {
           <option value="trabalhou" ${status==='trabalhou'?'selected':''}>Trabalhou</option>
           <option value="folga" ${status==='folga'?'selected':''}>Folga</option>
           <option value="falta" ${status==='falta'?'selected':''}>Falta</option>
+          <option value="ferias" ${status==='ferias'?'selected':''}>Férias</option>
         </select>
       </div>
     </div>`;
@@ -760,8 +802,10 @@ async function salvarPresenca(){
   const data=document.getElementById('pr-data').value;
   if(!data){alert('Selecione a data.');return;}
   if(!DB.ponto[data]) DB.ponto[data]={};
-  DB.funcs.forEach(f=>{
+  DB.funcs.filter(f=>!f.arquivado).forEach(f=>{
     const st=document.getElementById('prs-'+f.id);if(!st)return;
+    const sf=statusFuncNaData(f,data);
+    if(sf==='antes_admissao') return; // não salva dias anteriores à admissão
     const status=st.value;
     const esc=getEscalaDia(f,data);
     const {horas,noturnas}=status==='trabalhou'?calcHorasFixas(esc.entrada,esc.saida,esc.intervalo):{horas:0,noturnas:0};
@@ -795,7 +839,7 @@ function renderComissao(){
   } else {
     html+='<div style="font-size:12px;color:var(--warn);margin-bottom:12px;padding:8px 12px;background:var(--warn-bg);border-radius:var(--radius-sm)">⚠ Presença não registrada para este dia — marque manualmente quem trabalhou</div>';
   }
-  DB.funcs.filter(f=>!f.arquivado).forEach(f=>{
+  DB.funcs.filter(f=>!f.arquivado&&statusFuncNaData(f,data)!=='antes_admissao').forEach(f=>{
     const p=ph[f.id];
     // se tem presença registrada, usa ela. se não, usa checkbox manual
     const trab=p?p.status==='trabalhou':!isFolga(f,data);
@@ -1007,6 +1051,7 @@ async function recalcularTodos() {
       if(p.status!=='trabalhou') return;
       const f=DB.funcs.find(f=>f.id==fid);
       if(!f) return;
+      if(statusFuncNaData(f,data)!=='normal') return;
       const esc=getEscalaDia(f,data);
       if(!esc.entrada||!esc.saida) return;
       const {horas,noturnas}=calcHorasFixas(esc.entrada,esc.saida,esc.intervalo);
