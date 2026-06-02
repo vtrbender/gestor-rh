@@ -183,8 +183,9 @@
       </div>
       <div class="sep"></div>
       <div class="section-label">Datas e situação</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:16px">
         <div class="form-group" style="margin:0"><label>Data de admissão</label><input type="date" id="e-admissao"></div>
+        <div class="form-group" style="margin:0"><label>Data de demissão</label><input type="date" id="e-demissao"></div>
         <div class="form-group" style="margin:0"><label>Início das férias</label><input type="date" id="e-ferias-ini"></div>
         <div class="form-group" style="margin:0"><label>Fim das férias</label><input type="date" id="e-ferias-fim"></div>
       </div>
@@ -256,8 +257,9 @@
 
         <div class="sep"></div>
         <div class="section-label">Datas e situação</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:16px">
           <div class="form-group" style="margin:0"><label>Data de admissão</label><input type="date" id="f-admissao"></div>
+          <div class="form-group" style="margin:0"><label>Data de demissão</label><input type="date" id="f-demissao"></div>
           <div class="form-group" style="margin:0"><label>Início das férias</label><input type="date" id="f-ferias-ini"></div>
           <div class="form-group" style="margin:0"><label>Fim das férias</label><input type="date" id="f-ferias-fim"></div>
         </div>
@@ -543,6 +545,7 @@ function isFolga(f, dataStr) {
 
 function statusFuncNaData(f, data) {
   if(f.admissao && data < f.admissao) return 'antes_admissao';
+  if(f.demissao && data > f.demissao) return 'apos_demissao';
   if(f.feriasIni && f.feriasFim && data >= f.feriasIni && data <= f.feriasFim) return 'ferias';
   return 'normal';
 }
@@ -555,6 +558,7 @@ async function cadastrarFunc() {
   DB.funcs.push({
     id:Date.now(), nome, cargo:document.getElementById('f-cargo').value.trim(), escala,
     admissao: document.getElementById('f-admissao').value||'',
+    demissao: document.getElementById('f-demissao').value||'',
     feriasIni: document.getElementById('f-ferias-ini').value||'',
     feriasFim: document.getElementById('f-ferias-fim').value||'',
   });
@@ -563,6 +567,7 @@ async function cadastrarFunc() {
   document.getElementById('f-nome').value='';
   document.getElementById('f-cargo').value='';
   document.getElementById('f-admissao').value='';
+  document.getElementById('f-demissao').value='';
   document.getElementById('f-ferias-ini').value='';
   document.getElementById('f-ferias-fim').value='';
   buildEscalaBody();
@@ -579,11 +584,12 @@ function renderFuncs() {
     const vtStr=DIAS.map((d,i)=>{const dia=f.escala&&f.escala[i];return dia&&dia.vt>0?`<span style="font-size:11px;color:var(--text2)">${DIAS[i]} <b style="font-family:'DM Mono',monospace;font-weight:500;color:var(--text)">${fmt(dia.vt)}</b></span>`:null;}).filter(Boolean).join(' &ensp;');
     const folgas=DIAS.filter((d,i)=>!f.escala||!f.escala[i]||!f.escala[i].entrada).join(', ');
     const admissaoStr=f.admissao?`<span style="font-size:11px;color:var(--text3)">desde ${new Date(f.admissao+'T12:00').toLocaleDateString('pt-BR')}</span>`:'';
+    const demissaoStr=f.demissao?`<span class="badge badge-red" style="margin-left:4px">Demitido ${new Date(f.demissao+'T12:00').toLocaleDateString('pt-BR')}</span>`:'';
     const feriasStr=f.feriasIni&&f.feriasFim?`<span class="badge" style="background:#E0F2FE;color:#0369A1;margin-left:4px">🏖 Férias ${new Date(f.feriasIni+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}–${new Date(f.feriasFim+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</span>`:'';
     if(f.arquivado){
       return `<tr style="opacity:.55"><td style="font-weight:600;white-space:nowrap">${f.nome} ${admissaoStr}</td><td style="color:var(--text2)">${f.cargo||'—'}</td><td colspan="2"><span class="badge badge-amber">Arquivado</span></td><td style="white-space:nowrap"><button class="btn btn-sm" onclick="desarquivarFunc(${f.id})">Reativar</button> <button class="btn btn-sm btn-danger" onclick="remFunc(${f.id})">Remover</button></td></tr>`;
     }
-    return `<tr><td style="font-weight:600;white-space:nowrap">${f.nome}<br>${admissaoStr}${feriasStr}</td><td style="color:var(--text2)">${f.cargo||'—'}</td><td style="line-height:2">${vtStr||'—'}</td><td><span class="badge badge-amber">${folgas||'Nenhuma'}</span></td><td style="white-space:nowrap;display:flex;gap:6px;padding:10px 12px"><button class="btn btn-sm" onclick="abrirEdicao(${f.id})">Editar</button><button class="btn btn-sm" onclick="arquivarFunc(${f.id})" style="color:var(--warn);border-color:#FDE68A;background:#FFFBEB">Arquivar</button><button class="btn btn-sm btn-danger" onclick="remFunc(${f.id})">Remover</button></td></tr>`;
+    return `<tr><td style="font-weight:600;white-space:nowrap">${f.nome}<br>${admissaoStr}${demissaoStr}${feriasStr}</td><td style="color:var(--text2)">${f.cargo||'—'}</td><td style="line-height:2">${vtStr||'—'}</td><td><span class="badge badge-amber">${folgas||'Nenhuma'}</span></td><td style="white-space:nowrap;display:flex;gap:6px;padding:10px 12px"><button class="btn btn-sm" onclick="abrirEdicao(${f.id})">Editar</button><button class="btn btn-sm" onclick="arquivarFunc(${f.id})" style="color:var(--warn);border-color:#FDE68A;background:#FFFBEB">Arquivar</button><button class="btn btn-sm btn-danger" onclick="remFunc(${f.id})">Remover</button></td></tr>`;
   }
 
   let html='<div class="table-wrap"><table><thead><tr>'+DIAS.map(d=>`<th style="text-align:center">${d}</th>`).join('')+'</tr></thead>';
@@ -625,6 +631,7 @@ function abrirEdicao(id) {
   document.getElementById('e-nome').value = f.nome;
   document.getElementById('e-cargo').value = f.cargo||'';
   document.getElementById('e-admissao').value = f.admissao||'';
+  document.getElementById('e-demissao').value = f.demissao||'';
   document.getElementById('e-ferias-ini').value = f.feriasIni||'';
   document.getElementById('e-ferias-fim').value = f.feriasFim||'';
   // monta escala no modal
@@ -684,6 +691,7 @@ async function salvarEdicao() {
     cargo: document.getElementById('e-cargo').value.trim(),
     escala,
     admissao: document.getElementById('e-admissao').value||'',
+    demissao: document.getElementById('e-demissao').value||'',
     feriasIni: document.getElementById('e-ferias-ini').value||'',
     feriasFim: document.getElementById('e-ferias-fim').value||'',
   };
@@ -762,7 +770,7 @@ function renderPresenca() {
   let html='<div class="card"><div class="ponto-grid">';
   funcsAtivos.forEach(f=>{
     const sf=statusFuncNaData(f,data);
-    if(sf==='antes_admissao') return; // não mostra antes da admissão
+    if(sf==='antes_admissao'||sf==='apos_demissao') return; // não mostra fora do período
     const folga=isFolga(f,data);
     const reg=hoje[f.id]||{};
     const isFerias=sf==='ferias';
@@ -805,7 +813,7 @@ async function salvarPresenca(){
   DB.funcs.filter(f=>!f.arquivado).forEach(f=>{
     const st=document.getElementById('prs-'+f.id);if(!st)return;
     const sf=statusFuncNaData(f,data);
-    if(sf==='antes_admissao') return; // não salva dias anteriores à admissão
+    if(sf==='antes_admissao'||sf==='apos_demissao') return; // não salva fora do período
     const status=st.value;
     const esc=getEscalaDia(f,data);
     const {horas,noturnas}=status==='trabalhou'?calcHorasFixas(esc.entrada,esc.saida,esc.intervalo):{horas:0,noturnas:0};
@@ -839,7 +847,7 @@ function renderComissao(){
   } else {
     html+='<div style="font-size:12px;color:var(--warn);margin-bottom:12px;padding:8px 12px;background:var(--warn-bg);border-radius:var(--radius-sm)">⚠ Presença não registrada para este dia — marque manualmente quem trabalhou</div>';
   }
-  DB.funcs.filter(f=>!f.arquivado&&statusFuncNaData(f,data)!=='antes_admissao').forEach(f=>{
+  DB.funcs.filter(f=>!f.arquivado&&statusFuncNaData(f,data)==='normal'||statusFuncNaData(f,data)==='ferias').forEach(f=>{
     const p=ph[f.id];
     // se tem presença registrada, usa ela. se não, usa checkbox manual
     const trab=p?p.status==='trabalhou':!isFolga(f,data);
