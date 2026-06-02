@@ -543,27 +543,46 @@ async function cadastrarFunc() {
 function renderFuncs() {
   const el=document.getElementById('lista-funcs');
   if(!DB.funcs.length){el.innerHTML='<div class="empty">Nenhum funcionário cadastrado ainda.</div>';return;}
-  el.innerHTML='<div class="table-wrap"><table><thead><tr><th>Nome</th><th>Cargo</th>'+
-    DIAS.map(d=>`<th style="text-align:center">${d}</th>`).join('')+
-    '<th></th></tr></thead><tbody>'+
-    DB.funcs.map(f=>{
-      const cols=DIAS.map((_,i)=>{
-        const d=f.escala[i];
-        if(!d||!d.entrada) return `<td style="text-align:center"><span class="badge badge-amber">folga</span></td>`;
-        const {horas}=calcHorasFixas(d.entrada,d.saida,d.intervalo);
-        return `<td style="text-align:center;font-size:11px;line-height:1.7">
-          <span style="font-family:'DM Mono',monospace;display:block">${d.entrada}–${d.saida}</span>
-          <span style="color:var(--text3)">${fmtH(horas)}</span>
-          ${d.vt>0?`<span style="color:var(--accent-text);display:block">${fmt(d.vt)}</span>`:''}
-        </td>`;
-      }).join('');
-      return `<tr><td style="font-weight:600;white-space:nowrap">${f.nome}</td><td style="color:var(--text2)">${f.cargo||'—'}</td>${cols}<td style="white-space:nowrap;display:flex;gap:6px;padding:10px 12px"><button class="btn btn-sm" onclick="abrirEdicao(${f.id})">Editar</button><button class="btn btn-sm btn-danger" onclick="remFunc(${f.id})">Remover</button></td></tr>`;
-    }).join('')+'</tbody></table></div>';
+
+  const ativos=DB.funcs.filter(f=>!f.arquivado);
+  const arquivados=DB.funcs.filter(f=>f.arquivado);
+
+  function linhaFunc(f) {
+    const vtStr=DIAS.map((d,i)=>{const dia=f.escala&&f.escala[i];return dia&&dia.vt>0?`<span style="font-size:11px;color:var(--text2)">${DIAS[i]} <b style="font-family:'DM Mono',monospace;font-weight:500;color:var(--text)">${fmt(dia.vt)}</b></span>`:null;}).filter(Boolean).join(' &ensp;');
+    const folgas=DIAS.filter((d,i)=>!f.escala||!f.escala[i]||!f.escala[i].entrada).join(', ');
+    if(f.arquivado){
+      return `<tr style="opacity:.55"><td style="font-weight:600;white-space:nowrap">${f.nome}</td><td style="color:var(--text2)">${f.cargo||'—'}</td><td colspan="2"><span class="badge badge-amber">Arquivado</span></td><td style="white-space:nowrap"><button class="btn btn-sm" onclick="desarquivarFunc(${f.id})">Reativar</button> <button class="btn btn-sm btn-danger" onclick="remFunc(${f.id})">Remover</button></td></tr>`;
+    }
+    return `<tr><td style="font-weight:600;white-space:nowrap">${f.nome}</td><td style="color:var(--text2)">${f.cargo||'—'}</td><td style="line-height:2">${vtStr||'—'}</td><td><span class="badge badge-amber">${folgas||'Nenhuma'}</span></td><td style="white-space:nowrap;display:flex;gap:6px;padding:10px 12px"><button class="btn btn-sm" onclick="abrirEdicao(${f.id})">Editar</button><button class="btn btn-sm" onclick="arquivarFunc(${f.id})" style="color:var(--warn);border-color:#FDE68A;background:#FFFBEB">Arquivar</button><button class="btn btn-sm btn-danger" onclick="remFunc(${f.id})">Remover</button></td></tr>`;
+  }
+
+  let html='<div class="table-wrap"><table><thead><tr>'+DIAS.map(d=>`<th style="text-align:center">${d}</th>`).join('')+'</tr></thead>';
+  html='<div class="table-wrap"><table><thead><tr><th>Nome</th><th>Cargo</th><th>VT por dia</th><th>Folgas</th><th></th></tr></thead><tbody>';
+  html+=ativos.map(linhaFunc).join('');
+  if(arquivados.length){
+    html+=`<tr><td colspan="5" style="padding:10px 12px;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--surface2)">Arquivados (${arquivados.length})</td></tr>`;
+    html+=arquivados.map(linhaFunc).join('');
+  }
+  html+='</tbody></table></div>';
+  el.innerHTML=html;
 }
 
 async function remFunc(id){
-  if(!confirm('Remover funcionário?'))return;
+  if(!confirm('Remover permanentemente? O histórico será perdido. Para preservar o histórico use Arquivar.'))return;
   DB.funcs=DB.funcs.filter(f=>f.id!==id);
+  await salvarDados();renderFuncs();populateRSelect();
+}
+
+async function arquivarFunc(id){
+  if(!confirm('Arquivar funcionário? Ele sairá do dia a dia mas o histórico será preservado.'))return;
+  const f=DB.funcs.find(f=>f.id===id);
+  if(f){ f.arquivado=true; f.arquivadoEm=new Date().toISOString().slice(0,10); }
+  await salvarDados();renderFuncs();populateRSelect();
+}
+
+async function desarquivarFunc(id){
+  const f=DB.funcs.find(f=>f.id===id);
+  if(f){ f.arquivado=false; delete f.arquivadoEm; }
   await salvarDados();renderFuncs();populateRSelect();
 }
 
@@ -702,9 +721,10 @@ function renderPresenca() {
   const d=new Date(data+'T12:00');
   dsEl.textContent=DIAS[d.getDay()]+', '+d.toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
   const hoje=DB.ponto[data]||{};
-  if(!DB.funcs.length){document.getElementById('presenca-lista').innerHTML='<div class="card"><div class="empty">Cadastre funcionários primeiro.</div></div>';return;}
+  const funcsAtivos=DB.funcs.filter(f=>!f.arquivado);
+  if(!funcsAtivos.length){document.getElementById('presenca-lista').innerHTML='<div class="card"><div class="empty">Cadastre funcionários primeiro.</div></div>';return;}
   let html='<div class="card"><div class="ponto-grid">';
-  DB.funcs.forEach(f=>{
+  funcsAtivos.forEach(f=>{
     const folga=isFolga(f,data);
     const reg=hoje[f.id]||{};
     const status=reg.status||(folga?'folga':'trabalhou');
@@ -775,7 +795,7 @@ function renderComissao(){
   } else {
     html+='<div style="font-size:12px;color:var(--warn);margin-bottom:12px;padding:8px 12px;background:var(--warn-bg);border-radius:var(--radius-sm)">⚠ Presença não registrada para este dia — marque manualmente quem trabalhou</div>';
   }
-  DB.funcs.forEach(f=>{
+  DB.funcs.filter(f=>!f.arquivado).forEach(f=>{
     const p=ph[f.id];
     // se tem presença registrada, usa ela. se não, usa checkbox manual
     const trab=p?p.status==='trabalhou':!isFolga(f,data);
@@ -825,7 +845,8 @@ function populateRSelect(){
   const el=document.getElementById('r-func');
   if(!el) return;
   const v=el.value;
-  el.innerHTML='<option value="">Todos</option>'+DB.funcs.map(f=>`<option value="${f.id}">${f.nome}</option>`).join('');
+  // resumo mostra todos (ativos e arquivados) para preservar historico
+  el.innerHTML='<option value="">Todos</option>'+DB.funcs.map(f=>`<option value="${f.id}">${f.nome}${f.arquivado?' (arquivado)':''}</option>`).join('');
   el.value=v;
 }
 
