@@ -427,17 +427,31 @@ function setSyncStatus(s, msg) {
 
 async function carregar() {
   setSyncStatus('loading','Carregando...');
-  try {
-    const r = await fetch(API+'?t='+Date.now(), {redirect:'follow'});
-    const text = await r.text();
-    const data = JSON.parse(text);
-    DB = data;
-    if(!DB.funcs) DB.funcs=[];
-    if(!DB.ponto) DB.ponto={};
-    if(!DB.comissao) DB.comissao={};
-    setSyncStatus('ok','Sincronizado · '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
-    renderFuncs(); populateRSelect(); renderCalendario();
-  } catch(e) { console.error('carregar erro:',e); setSyncStatus('error','Erro de conexão'); }
+  // tenta até 3 vezes com intervalo crescente
+  for(let tentativa=1; tentativa<=3; tentativa++) {
+    try {
+      const r = await fetch(API+'?t='+Date.now(), {redirect:'follow', cache:'no-store'});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const text = await r.text();
+      if(text.trim().startsWith('<')) throw new Error('HTML recebido em vez de JSON');
+      const data = JSON.parse(text);
+      DB = data;
+      if(!DB.funcs) DB.funcs=[];
+      if(!DB.ponto) DB.ponto={};
+      if(!DB.comissao) DB.comissao={};
+      setSyncStatus('ok','Sincronizado · '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
+      renderFuncs(); populateRSelect(); renderCalendario();
+      return;
+    } catch(e) {
+      console.error('carregar erro tentativa '+tentativa+':', e);
+      if(tentativa < 3) {
+        setSyncStatus('loading','Reconectando... ('+tentativa+'/3)');
+        await new Promise(r => setTimeout(r, 2000 * tentativa));
+      } else {
+        setSyncStatus('error','Erro de conexão — clique em Atualizar dados');
+      }
+    }
+  }
 }
 
 async function salvarDados(okId) {
