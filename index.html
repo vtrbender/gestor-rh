@@ -455,13 +455,25 @@ async function carregar() {
 }
 
 async function salvarDados(okId) {
-  if(saving) return; saving=true;
+  saving=true;
   setSyncStatus('loading','Salvando...');
   try {
-    await fetch(API, {method:'POST', redirect:'follow', body:JSON.stringify(DB), headers:{'Content-Type':'text/plain'}});
+    console.log('Iniciando POST para:', API);
+    console.log('Tamanho dos dados:', JSON.stringify(DB).length, 'chars');
+    const resp = await fetch(API, {
+      method:'POST',
+      redirect:'follow',
+      body:JSON.stringify(DB),
+      headers:{'Content-Type':'text/plain'}
+    });
+    const text = await resp.text();
+    console.log('Resposta do POST:', text);
     setSyncStatus('ok','Salvo · '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
     if(okId){const el=document.getElementById(okId);el.style.display='inline';setTimeout(()=>el.style.display='none',3000);}
-  } catch(e){ console.error('salvar erro:',e); setSyncStatus('error','Erro ao salvar'); }
+  } catch(e){
+    console.error('salvar erro:', e);
+    setSyncStatus('error','Erro ao salvar: '+e.message);
+  }
   saving=false;
 }
 
