@@ -163,6 +163,10 @@
         <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v3l2 2"/><path d="M5.5 8h5"/></svg>
         Adiantamentos
       </button>
+      <button class="nav-item" onclick="goPage('historico',this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2z"/><path d="M8 5v3.5l2.5 1.5"/><path d="M2 2l12 12" stroke-width="1"/></svg>
+        Histórico
+      </button>
       <button class="nav-item" onclick="goPage('resumo',this)">
         <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12l4-4 3 3 5-6M10 5h4v4"/></svg>
         Resumo mensal
@@ -187,9 +191,10 @@
       </div>
       <div class="sep"></div>
       <div class="section-label">Datas e situação</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:12px;margin-bottom:16px">
         <div class="form-group" style="margin:0"><label>Data de admissão</label><input type="date" id="e-admissao"></div>
         <div class="form-group" style="margin:0"><label>Data de demissão</label><input type="date" id="e-demissao"></div>
+        <div class="form-group" style="margin:0"><label>Aniversário</label><input type="date" id="e-aniversario"></div>
         <div class="form-group" style="margin:0"><label>Início das férias</label><input type="date" id="e-ferias-ini"></div>
         <div class="form-group" style="margin:0"><label>Fim das férias</label><input type="date" id="e-ferias-fim"></div>
       </div>
@@ -261,9 +266,10 @@
 
         <div class="sep"></div>
         <div class="section-label">Datas e situação</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:12px;margin-bottom:16px">
           <div class="form-group" style="margin:0"><label>Data de admissão</label><input type="date" id="f-admissao"></div>
           <div class="form-group" style="margin:0"><label>Data de demissão</label><input type="date" id="f-demissao"></div>
+          <div class="form-group" style="margin:0"><label>Aniversário</label><input type="date" id="f-aniversario"></div>
           <div class="form-group" style="margin:0"><label>Início das férias</label><input type="date" id="f-ferias-ini"></div>
           <div class="form-group" style="margin:0"><label>Fim das férias</label><input type="date" id="f-ferias-fim"></div>
         </div>
@@ -418,6 +424,36 @@
       </div>
     </div>
 
+    <!-- HISTÓRICO DO FUNCIONÁRIO -->
+    <div class="page" id="page-historico">
+      <div class="page-header"><h2>Histórico do funcionário</h2><p>Consulte presença, horas, VT, comissão e adiantamentos por período</p></div>
+      <div class="card">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:12px;align-items:flex-end">
+          <div class="form-group" style="margin:0"><label>Funcionário</label>
+            <select id="hist-func"><option value="">Selecione...</option></select>
+          </div>
+          <div class="form-group" style="margin:0"><label>Data início</label>
+            <input type="date" id="hist-ini">
+          </div>
+          <div class="form-group" style="margin:0"><label>Data fim</label>
+            <input type="date" id="hist-fim">
+          </div>
+          <div class="form-group" style="margin:0"><label>Atalho</label>
+            <select id="hist-atalho" onchange="aplicarAtalhoHist()">
+              <option value="">Personalizado</option>
+              <option value="30">Últimos 30 dias</option>
+              <option value="mes">Mês atual</option>
+              <option value="mes_ant">Mês anterior</option>
+              <option value="sem">Semana atual</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="calcHistorico()" style="margin-bottom:1px">Consultar</button>
+        </div>
+      </div>
+      <div id="hist-resumo-cards" class="metrics" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr));margin-bottom:16px;display:none"></div>
+      <div class="card" id="hist-tabela"><div class="empty">Selecione um funcionário e período.</div></div>
+    </div>
+
     <!-- RESUMO -->
     <div class="page" id="page-resumo">
       <div class="page-header"><h2>Resumo mensal</h2><p>Totais para envio ao contador e controle interno</p></div>
@@ -500,7 +536,7 @@ async function carregar() {
       if(!DB.feriados) DB.feriados={};
       if(!DB.adiantamentos) DB.adiantamentos=[];
       setSyncStatus('ok','Sincronizado · '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
-      renderFuncs(); populateRSelect(); renderCalendario();
+      renderFuncs(); populateRSelect(); renderCalendario(); popularHistoricoSelect();
       return;
     } catch(e) {
       console.error('carregar erro tentativa '+tentativa+':', e);
@@ -547,6 +583,7 @@ function goPage(id, btn) {
   if(id==='comissao') renderComissao();
   if(id==='semana') { document.getElementById('sem-data').value=new Date().toISOString().slice(0,10); calcSemana(); }
   if(id==='adiantamentos') renderAdiantamentos();
+  if(id==='historico'){popularHistoricoSelect();aplicarAtalhoHist();}
   if(id==='resumo'){populateRSelect();calcResumo();}
 }
 
@@ -619,10 +656,17 @@ function calcHorasFixas(entrada, saida, intervalo) {
 }
 
 function getEscalaDia(f, dataStr) {
-  // retorna a escala do dia da semana correspondente
   const dow = new Date(dataStr+'T12:00').getDay();
-  const dia = f.escala[dow];
-  return dia || {entrada:'',saida:'',intervalo:60,vt:0};
+  const dia = f.escala&&f.escala[dow]?{...f.escala[dow]}:{entrada:'',saida:'',intervalo:60,vt:0};
+  // aplica VT histórico para datas passadas
+  if(f.histVT&&f.histVT.length>0){
+    const hoje=new Date().toISOString().slice(0,10);
+    if(dataStr<hoje){
+      const mudancas=f.histVT.filter(h=>h.dia===dow&&h.data>dataStr).sort((a,b)=>a.data.localeCompare(b.data));
+      if(mudancas.length>0) dia.vt=mudancas[0].vtAnterior||0;
+    }
+  }
+  return dia;
 }
 
 function isFolga(f, dataStr) {
@@ -646,6 +690,7 @@ async function cadastrarFunc() {
     id:Date.now(), nome, cargo:document.getElementById('f-cargo').value.trim(), escala,
     admissao: document.getElementById('f-admissao').value||'',
     demissao: document.getElementById('f-demissao').value||'',
+    aniversario: document.getElementById('f-aniversario').value||'',
     feriasIni: document.getElementById('f-ferias-ini').value||'',
     feriasFim: document.getElementById('f-ferias-fim').value||'',
   });
@@ -655,6 +700,7 @@ async function cadastrarFunc() {
   document.getElementById('f-cargo').value='';
   document.getElementById('f-admissao').value='';
   document.getElementById('f-demissao').value='';
+  document.getElementById('f-aniversario').value='';
   document.getElementById('f-ferias-ini').value='';
   document.getElementById('f-ferias-fim').value='';
   buildEscalaBody();
@@ -671,12 +717,18 @@ function renderFuncs() {
     const vtStr=DIAS.map((d,i)=>{const dia=f.escala&&f.escala[i];return dia&&dia.vt>0?`<span style="font-size:11px;color:var(--text2)">${DIAS[i]} <b style="font-family:'DM Mono',monospace;font-weight:500;color:var(--text)">${fmt(dia.vt)}</b></span>`:null;}).filter(Boolean).join(' &ensp;');
     const folgas=DIAS.filter((d,i)=>!f.escala||!f.escala[i]||!f.escala[i].entrada).join(', ');
     const admissaoStr=f.admissao?`<span style="font-size:11px;color:var(--text3)">desde ${new Date(f.admissao+'T12:00').toLocaleDateString('pt-BR')}</span>`:'';
+    const hoje2=new Date();
+    const anivStr=f.aniversario?(()=>{
+      const d=new Date(f.aniversario+'T12:00');
+      const isHoje=d.getDate()===hoje2.getDate()&&d.getMonth()===hoje2.getMonth();
+      return `<span style="font-size:11px;color:var(--text2);margin-left:4px">${isHoje?'🎂':''}${d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</span>`;
+    })():'';
     const demissaoStr=f.demissao?`<span class="badge badge-red" style="margin-left:4px">Demitido ${new Date(f.demissao+'T12:00').toLocaleDateString('pt-BR')}</span>`:'';
     const feriasStr=f.feriasIni&&f.feriasFim?`<span class="badge" style="background:#E0F2FE;color:#0369A1;margin-left:4px">🏖 Férias ${new Date(f.feriasIni+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}–${new Date(f.feriasFim+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</span>`:'';
     if(f.arquivado){
       return `<tr style="opacity:.55"><td style="font-weight:600;white-space:nowrap">${f.nome} ${admissaoStr}</td><td style="color:var(--text2)">${f.cargo||'—'}</td><td colspan="2"><span class="badge badge-amber">Arquivado</span></td><td style="white-space:nowrap"><button class="btn btn-sm" onclick="desarquivarFunc(${f.id})">Reativar</button> <button class="btn btn-sm btn-danger" onclick="remFunc(${f.id})">Remover</button></td></tr>`;
     }
-    return `<tr><td style="font-weight:600;white-space:nowrap">${f.nome}<br>${admissaoStr}${demissaoStr}${feriasStr}</td><td style="color:var(--text2)">${f.cargo||'—'}</td><td style="line-height:2">${vtStr||'—'}</td><td><span class="badge badge-amber">${folgas||'Nenhuma'}</span></td><td style="white-space:nowrap;display:flex;gap:6px;padding:10px 12px"><button class="btn btn-sm" onclick="abrirEdicao(${f.id})">Editar</button><button class="btn btn-sm" onclick="arquivarFunc(${f.id})" style="color:var(--warn);border-color:#FDE68A;background:#FFFBEB">Arquivar</button><button class="btn btn-sm btn-danger" onclick="remFunc(${f.id})">Remover</button></td></tr>`;
+    return `<tr><td style="font-weight:600;white-space:nowrap">${f.nome}<br>${admissaoStr}${anivStr}${demissaoStr}${feriasStr}</td><td style="color:var(--text2)">${f.cargo||'—'}</td><td style="line-height:2">${vtStr||'—'}</td><td><span class="badge badge-amber">${folgas||'Nenhuma'}</span></td><td style="white-space:nowrap;display:flex;gap:6px;padding:10px 12px"><button class="btn btn-sm" onclick="abrirEdicao(${f.id})">Editar</button><button class="btn btn-sm" onclick="arquivarFunc(${f.id})" style="color:var(--warn);border-color:#FDE68A;background:#FFFBEB">Arquivar</button><button class="btn btn-sm btn-danger" onclick="remFunc(${f.id})">Remover</button></td></tr>`;
   }
 
   let html='<div class="table-wrap"><table><thead><tr>'+DIAS.map(d=>`<th style="text-align:center">${d}</th>`).join('')+'</tr></thead>';
@@ -719,6 +771,7 @@ function abrirEdicao(id) {
   document.getElementById('e-cargo').value = f.cargo||'';
   document.getElementById('e-admissao').value = f.admissao||'';
   document.getElementById('e-demissao').value = f.demissao||'';
+  document.getElementById('e-aniversario').value = f.aniversario||'';
   document.getElementById('e-ferias-ini').value = f.feriasIni||'';
   document.getElementById('e-ferias-fim').value = f.feriasFim||'';
   // monta escala no modal
@@ -772,6 +825,19 @@ async function salvarEdicao() {
       vt:      parseFloat(document.getElementById('vt-e'+i)?.value)||0,
     };
   });
+  // detecta mudança de VT e registra histórico
+  const funcAtual=DB.funcs[idx];
+  const hoje=new Date().toISOString().slice(0,10);
+  const histVT=funcAtual.histVT||[];
+  let vtMudou=false;
+  DIAS.forEach((_,i)=>{
+    const vtAntigo=(funcAtual.escala&&funcAtual.escala[i])?funcAtual.escala[i].vt||0:0;
+    const vtNovo=escala[i].vt||0;
+    if(vtAntigo!==vtNovo){
+      vtMudou=true;
+      histVT.push({dia:i,vtAnterior:vtAntigo,vtNovo,data:hoje});
+    }
+  });
   DB.funcs[idx] = {
     ...DB.funcs[idx],
     nome: document.getElementById('e-nome').value.trim()||DB.funcs[idx].nome,
@@ -779,8 +845,10 @@ async function salvarEdicao() {
     escala,
     admissao: document.getElementById('e-admissao').value||'',
     demissao: document.getElementById('e-demissao').value||'',
+    aniversario: document.getElementById('e-aniversario').value||'',
     feriasIni: document.getElementById('e-ferias-ini').value||'',
     feriasFim: document.getElementById('e-ferias-fim').value||'',
+    histVT,
   };
   await salvarDados('e-ok');
   renderFuncs(); populateRSelect();
@@ -1264,6 +1332,116 @@ function mudarSemana(delta) {
   calcSemana();
 }
 
+// HISTÓRICO DO FUNCIONÁRIO
+function popularHistoricoSelect() {
+  const sel=document.getElementById('hist-func');
+  if(!sel) return;
+  const v=sel.value;
+  sel.innerHTML='<option value="">Selecione...</option>'+
+    DB.funcs.map(f=>`<option value="${f.id}">${f.nome}${f.arquivado?' (arquivado)':''}</option>`).join('');
+  sel.value=v;
+}
+
+function aplicarAtalhoHist() {
+  const atalho=document.getElementById('hist-atalho').value;
+  const hoje=new Date();
+  let ini,fim;
+  if(atalho==='30'){
+    fim=new Date(); ini=new Date(); ini.setDate(ini.getDate()-29);
+  } else if(atalho==='mes'){
+    ini=new Date(hoje.getFullYear(),hoje.getMonth(),1);
+    fim=new Date(hoje.getFullYear(),hoje.getMonth()+1,0);
+  } else if(atalho==='mes_ant'){
+    ini=new Date(hoje.getFullYear(),hoje.getMonth()-1,1);
+    fim=new Date(hoje.getFullYear(),hoje.getMonth(),0);
+  } else if(atalho==='sem'){
+    const dow=hoje.getDay();
+    const diff=dow===0?-6:1-dow;
+    ini=new Date(hoje); ini.setDate(hoje.getDate()+diff);
+    fim=new Date(ini); fim.setDate(ini.getDate()+6);
+  } else return;
+  document.getElementById('hist-ini').value=ini.toISOString().slice(0,10);
+  document.getElementById('hist-fim').value=fim.toISOString().slice(0,10);
+}
+
+function calcHistorico() {
+  const funcId=document.getElementById('hist-func').value;
+  const ini=document.getElementById('hist-ini').value;
+  const fim=document.getElementById('hist-fim').value;
+  if(!funcId){alert('Selecione um funcionário.');return;}
+  if(!ini||!fim){alert('Informe o período.');return;}
+  
+  const f=DB.funcs.find(f=>f.id==funcId);
+  if(!f) return;
+
+  let tH=0,tN=0,tV=0,tC=0,tDt=0,tDf=0,tDfa=0,tFer=0,tAd=0;
+  const linhas=[];
+
+  // itera por cada dia do período
+  const dIni=new Date(ini+'T12:00');
+  const dFim=new Date(fim+'T12:00');
+  for(let d=new Date(dIni);d<=dFim;d.setDate(d.getDate()+1)){
+    const ds=d.toISOString().slice(0,10);
+    const p=(DB.ponto[ds]||{})[f.id];
+    const cc=(DB.comissao[ds]||{})[f.id];
+    const isFer=DB.feriados&&DB.feriados[ds];
+    const ads=(DB.adiantamentos||[]).filter(a=>a.funcId==f.id&&a.data===ds);
+    const adVal=ads.reduce((s,a)=>s+a.valor,0);
+
+    if(!p&&!cc&&!ads.length) continue;
+
+    const status=p?p.status:'—';
+    const h=p&&p.status==='trabalhou'?p.horas||0:0;
+    const n=p&&p.status==='trabalhou'?p.noturnas||0:0;
+    const v=p&&p.status==='trabalhou'?p.vt||0:0;
+    const c=cc&&cc.incluir?cc.valor||0:0;
+
+    if(status==='trabalhou'){tDt++;tH+=h;tN+=n;tV+=v;if(isFer)tFer++;}
+    else if(status==='folga')tDf++;
+    else if(status==='falta')tDfa++;
+    tC+=c;tAd+=adVal;
+
+    linhas.push({ds,status,h,n,v,c,isFer,ads});
+  }
+
+  // Adiantamentos no período (pela data do adiantamento)
+  const adsPeriodo=(DB.adiantamentos||[]).filter(a=>a.funcId==f.id&&a.data>=ini&&a.data<=fim);
+
+  document.getElementById('hist-resumo-cards').style.display='grid';
+  document.getElementById('hist-resumo-cards').innerHTML=`
+    <div class="metric"><div class="metric-label">Dias trab.</div><div class="metric-value">${tDt}</div></div>
+    <div class="metric"><div class="metric-label">Folgas</div><div class="metric-value">${tDf}</div></div>
+    <div class="metric"><div class="metric-label">Faltas</div><div class="metric-value">${tDfa}</div></div>
+    <div class="metric"><div class="metric-label">Feriados</div><div class="metric-value">${tFer}</div></div>
+    <div class="metric"><div class="metric-label">H. totais</div><div class="metric-value">${fmtH(tH)}</div></div>
+    <div class="metric"><div class="metric-label">H. noturnas</div><div class="metric-value">${fmtH(tN)}</div></div>
+    <div class="metric"><div class="metric-label">VT total</div><div class="metric-value">${fmt(tV)}</div></div>
+    <div class="metric"><div class="metric-label">Comissão</div><div class="metric-value">${fmt(tC)}</div></div>
+    <div class="metric"><div class="metric-label">Adiantamentos</div><div class="metric-value">${fmt(tAd)}</div></div>`;
+
+  document.getElementById('hist-tabela').innerHTML=linhas.length?`
+    <div class="card-title" style="margin-bottom:12px">Histórico de ${f.nome} — ${new Date(ini+'T12:00').toLocaleDateString('pt-BR')} a ${new Date(fim+'T12:00').toLocaleDateString('pt-BR')}</div>
+    <div class="table-wrap"><table>
+    <thead><tr><th>Data</th><th>Dia</th><th>Status</th><th>H. normais</th><th>H. noturnas</th><th>VT</th><th>Comissão</th><th>Adiantamento</th></tr></thead>
+    <tbody>`+linhas.map(l=>{
+      const adStr=l.ads.length?fmt(l.ads.reduce((s,a)=>s+a.valor,0)):'—';
+      const statusBadge=l.status==='trabalhou'?`<span class="badge badge-green">${l.isFer?'🎉 Feriado':'Trabalhou'}</span>`:
+        l.status==='folga'?'<span class="badge badge-amber">Folga</span>':
+        l.status==='falta'?'<span class="badge badge-red">Falta</span>':'—';
+      return `<tr>
+        <td>${new Date(l.ds+'T12:00').toLocaleDateString('pt-BR')}</td>
+        <td style="color:var(--text2)">${DIAS[new Date(l.ds+'T12:00').getDay()]}</td>
+        <td>${statusBadge}</td>
+        <td style="font-family:'DM Mono',monospace">${l.h>0?fmtH(l.h):'—'}</td>
+        <td style="font-family:'DM Mono',monospace;color:var(--warn)">${l.n>0?fmtH(l.n):'—'}</td>
+        <td style="font-family:'DM Mono',monospace">${l.v>0?fmt(l.v):'—'}</td>
+        <td style="font-family:'DM Mono',monospace;color:var(--accent)">${l.c>0?fmt(l.c):'—'}</td>
+        <td style="font-family:'DM Mono',monospace;color:var(--danger)">${adStr}</td>
+      </tr>`;
+    }).join('')+'</tbody></table></div>':
+    '<div class="empty">Sem dados no período selecionado.</div>';
+}
+
 // ADIANTAMENTOS
 function renderAdiantamentos() {
   // populate select
@@ -1387,6 +1565,13 @@ function renderCalendario() {
     const temPresenca = DB.ponto[dataStr] && Object.keys(DB.ponto[dataStr]).length>0;
     const temComissao = DB.comissao[dataStr] && DB.comissao[dataStr]._total>0;
     const isHoje = hoje.getFullYear()===calAno && hoje.getMonth()===calMes && hoje.getDate()===dia;
+    const isFeriado = DB.feriados && DB.feriados[dataStr];
+    // verifica aniversários neste dia/mês
+    const aniversariantes = DB.funcs.filter(f=>{
+      if(!f.aniversario||f.arquivado) return false;
+      const d=new Date(f.aniversario+'T12:00');
+      return d.getDate()===dia && d.getMonth()===calMes;
+    });
 
     let badges = '';
     if(temPresenca && temComissao) {
@@ -1408,6 +1593,12 @@ function renderCalendario() {
       </div>`;
     }
 
+    if(aniversariantes.length>0){
+      badges+=`<div class="cal-badge" style="background:#FDF2F8;color:#9D174D;font-size:10px">🎂 ${aniversariantes.map(f=>f.nome.split(' ')[0]).join(', ')}</div>`;
+    }
+    if(isFeriado&&!badges.includes('🎉')){
+      badges+=`<div class="cal-badge" style="background:#FEF3C7;color:#92400E;font-size:10px">🎉 Feriado</div>`;
+    }
     html+=`<div class="cal-day${isHoje?' hoje':''}" onclick="irParaDia('${dataStr}')">
       <div class="cal-day-num">${dia}</div>
       <div class="cal-badges">${badges}</div>
