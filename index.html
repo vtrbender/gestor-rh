@@ -159,6 +159,10 @@
         <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="2" width="14" height="12" rx="1.5"/><path d="M1 6h14M5 2v4M11 2v4"/></svg>
         Semana
       </button>
+      <button class="nav-item" onclick="goPage('adiantamentos',this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v3l2 2"/><path d="M5.5 8h5"/></svg>
+        Adiantamentos
+      </button>
       <button class="nav-item" onclick="goPage('resumo',this)">
         <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12l4-4 3 3 5-6M10 5h4v4"/></svg>
         Resumo mensal
@@ -304,8 +308,15 @@
           <div style="padding-bottom:8px;font-size:13px;color:var(--text2)" id="pr-diasemana"></div>
         </div>
       </div>
+      <div id="presenca-confirmado" style="display:none;padding:8px 14px;background:var(--accent-bg);color:var(--accent-text);border-radius:var(--radius-sm);font-size:13px;margin-bottom:8px">
+        ✓ Presença já confirmada para este dia — você pode editar e salvar novamente se precisar corrigir
+      </div>
       <div id="presenca-lista"><div class="empty">Selecione uma data.</div></div>
-      <div class="save-row" style="margin-top:4px">
+      <div class="save-row" style="margin-top:8px;flex-wrap:wrap;gap:12px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:7px 12px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface)">
+          <input type="checkbox" id="pr-feriado" style="width:16px;height:16px;margin:0;accent-color:var(--warn)">
+          <span>🎉 Dia de feriado</span>
+        </label>
         <button class="btn btn-primary" onclick="salvarPresenca()">Salvar presença do dia</button>
         <span class="save-msg" id="pr-ok">✓ Salvo no Google Sheets</span>
       </div>
@@ -345,7 +356,7 @@
 
     <!-- SEMANA -->
     <div class="page" id="page-semana">
-      <div class="page-header"><h2>Resumo semanal</h2><p>Comissão acumulada de segunda a domingo — valor a pagar na próxima segunda</p></div>
+      <div class="page-header"><h2>Resumo semanal</h2><p>Totais da semana por funcionário — de segunda a domingo</p></div>
       <div class="card">
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <div class="form-group" style="margin:0"><label>Qualquer dia da semana</label><input type="date" id="sem-data" onchange="calcSemana()" style="width:180px"></div>
@@ -356,8 +367,55 @@
           </div>
         </div>
       </div>
-      <div id="sem-cards" class="metrics" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))"></div>
+      <div id="sem-cards" class="metrics" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));margin-bottom:16px"></div>
       <div class="card" id="sem-tabela"><div class="empty">Selecione uma data.</div></div>
+    </div>
+
+    <!-- ADIANTAMENTOS -->
+    <div class="page" id="page-adiantamentos">
+      <div class="page-header"><h2>Adiantamentos</h2><p>Registre adiantamentos e defina se serão descontados da comissão semanal ou do salário mensal</p></div>
+      <div class="card">
+        <div class="card-title">Novo adiantamento</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 140px 1fr 1fr;gap:12px;margin-bottom:14px">
+          <div class="form-group" style="margin:0"><label>Funcionário</label>
+            <select id="ad-func"><option value="">Selecione...</option></select>
+          </div>
+          <div class="form-group" style="margin:0"><label>Valor (R$)</label>
+            <input type="number" id="ad-valor" placeholder="0,00" step="0.01" min="0">
+          </div>
+          <div class="form-group" style="margin:0"><label>Data</label>
+            <input type="date" id="ad-data">
+          </div>
+          <div class="form-group" style="margin:0"><label>Forma de pagamento</label>
+            <select id="ad-forma">
+              <option value="pix">Pix</option>
+              <option value="dinheiro">Dinheiro</option>
+              <option value="outro">Outro</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0"><label>Descontar de</label>
+            <select id="ad-tipo">
+              <option value="comissao">Comissão (próxima segunda)</option>
+              <option value="salario">Salário (até dia 6)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:14px"><label>Observação (opcional)</label>
+          <input type="text" id="ad-obs" placeholder="Ex: adiantamento pedido pelo funcionário">
+        </div>
+        <div class="save-row">
+          <button class="btn btn-primary" onclick="lancarAdiantamento()">Lançar adiantamento</button>
+          <span class="save-msg" id="ad-ok">✓ Salvo</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Adiantamentos pendentes</div>
+        <div id="ad-pendentes"><div class="empty">Nenhum adiantamento pendente.</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Histórico</div>
+        <div id="ad-historico"><div class="empty">Nenhum adiantamento no histórico.</div></div>
+      </div>
     </div>
 
     <!-- RESUMO -->
@@ -417,7 +475,7 @@ const DIAS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const fmt = n => 'R$ ' + Number(n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtH = h => { const t=Math.round((h||0)*60); return `${Math.floor(t/60)}h${String(t%60).padStart(2,'0')}m`; };
 
-let DB = { funcs:[], ponto:{}, comissao:{} };
+let DB = { funcs:[], ponto:{}, comissao:{}, feriados:{}, adiantamentos:[] };
 let saving = false;
 
 function setSyncStatus(s, msg) {
@@ -439,6 +497,8 @@ async function carregar() {
       if(!DB.funcs) DB.funcs=[];
       if(!DB.ponto) DB.ponto={};
       if(!DB.comissao) DB.comissao={};
+      if(!DB.feriados) DB.feriados={};
+      if(!DB.adiantamentos) DB.adiantamentos=[];
       setSyncStatus('ok','Sincronizado · '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
       renderFuncs(); populateRSelect(); renderCalendario();
       return;
@@ -486,6 +546,7 @@ function goPage(id, btn) {
   if(id==='presenca') renderPresenca();
   if(id==='comissao') renderComissao();
   if(id==='semana') { document.getElementById('sem-data').value=new Date().toISOString().slice(0,10); calcSemana(); }
+  if(id==='adiantamentos') renderAdiantamentos();
   if(id==='resumo'){populateRSelect();calcResumo();}
 }
 
@@ -734,6 +795,11 @@ function renderPonto() {
   const d=new Date(data+'T12:00');
   dsEl.textContent=DIAS[d.getDay()]+', '+d.toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
   const hoje=DB.ponto[data]||{};
+  // mostra badge de confirmado e estado do feriado
+  const temPresenca=Object.keys(hoje).length>0;
+  confirmado.style.display=temPresenca?'block':'none';
+  const feriadoEl=document.getElementById('pr-feriado');
+  if(feriadoEl) feriadoEl.checked=DB.feriados&&DB.feriados[data]?true:false;
   if(!DB.funcs.length){document.getElementById('ponto-lista').innerHTML='<div class="card"><div class="empty">Cadastre funcionários primeiro.</div></div>';return;}
 
   let html='<div class="card"><div class="ponto-grid">';
@@ -787,10 +853,16 @@ async function salvarPonto(){
 function renderPresenca() {
   const data=document.getElementById('pr-data').value;
   const dsEl=document.getElementById('pr-diasemana');
-  if(!data){document.getElementById('presenca-lista').innerHTML='<div class="empty">Selecione uma data.</div>';dsEl.textContent='';return;}
+  const confirmado=document.getElementById('presenca-confirmado');
+  if(!data){document.getElementById('presenca-lista').innerHTML='<div class="empty">Selecione uma data.</div>';dsEl.textContent='';confirmado.style.display='none';return;}
   const d=new Date(data+'T12:00');
   dsEl.textContent=DIAS[d.getDay()]+', '+d.toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
   const hoje=DB.ponto[data]||{};
+  // mostra badge de confirmado e estado do feriado
+  const temPresenca=Object.keys(hoje).length>0;
+  confirmado.style.display=temPresenca?'block':'none';
+  const feriadoEl=document.getElementById('pr-feriado');
+  if(feriadoEl) feriadoEl.checked=DB.feriados&&DB.feriados[data]?true:false;
   const funcsAtivos=DB.funcs.filter(f=>!f.arquivado);
   if(!funcsAtivos.length){document.getElementById('presenca-lista').innerHTML='<div class="card"><div class="empty">Cadastre funcionários primeiro.</div></div>';return;}
   let html='<div class="card"><div class="ponto-grid">';
@@ -858,7 +930,17 @@ async function salvarPresenca(){
       DB.comissao[data][f.id]={incluir:inc,valor:inc?parte:0};
     });
   }
+  // salva feriado
+  if(!DB.feriados) DB.feriados={};
+  const feriadoEl=document.getElementById('pr-feriado');
+  if(feriadoEl){
+    if(feriadoEl.checked) DB.feriados[data]=true;
+    else delete DB.feriados[data];
+  }
   await salvarDados('pr-ok');
+  // atualiza badge de confirmado
+  const confirmado=document.getElementById('presenca-confirmado');
+  if(confirmado) confirmado.style.display='block';
 }
 
 // COMISSÃO
@@ -946,8 +1028,15 @@ function calcResumo(){
       if(mes&&!d.startsWith(mes))return;
       const cc=(DB.comissao[d]||{})[f.id];if(cc&&cc.incluir)c+=cc.valor||0;
     });
+    // conta feriados trabalhados no mês
+    let fer=0;
+    Object.keys(DB.ponto||{}).forEach(d=>{
+      if(mes&&!d.startsWith(mes))return;
+      const p=(DB.ponto[d]||{})[f.id];
+      if(p&&p.status==='trabalhou'&&DB.feriados&&DB.feriados[d]) fer++;
+    });
     tH+=h;tN+=n;tV+=v;tC+=c;
-    return {f,dt,df,dfa,h,n,v,c};
+    return {f,dt,df,dfa,h,n,v,c,fer};
   });
 
   document.getElementById('r-metrics').innerHTML=`
@@ -959,10 +1048,11 @@ function calcResumo(){
   document.getElementById('r-tabela').innerHTML=rows.length?`
     <div class="card-title">Detalhamento completo por funcionário</div>
     <div class="table-wrap"><table>
-    <thead><tr><th>Funcionário</th><th>Dias trab.</th><th>Folgas</th><th>Faltas</th><th>H. totais</th><th>H. noturnas</th><th>VT total</th><th>Comissão</th></tr></thead>
+    <thead><tr><th>Funcionário</th><th>Dias trab.</th><th>Folgas</th><th>Faltas</th><th>Feriados</th><th>H. totais</th><th>H. noturnas</th><th>VT total</th><th>Comissão</th></tr></thead>
     <tbody>`+rows.map(r=>`<tr>
       <td style="font-weight:600">${r.f.nome}</td>
       <td>${r.dt}</td><td>${r.df}</td><td>${r.dfa}</td>
+      <td style="text-align:center">${r.fer>0?'🎉 '+r.fer:'—'}</td>
       <td style="font-family:'DM Mono',monospace">${fmtH(r.h)}</td>
       <td style="font-family:'DM Mono',monospace;color:var(--warn);font-weight:500">${fmtH(r.n)}</td>
       <td style="font-family:'DM Mono',monospace;color:var(--accent-text);font-weight:500">${fmt(r.v)}</td>
@@ -1005,6 +1095,7 @@ function exportarContador() {
       <td style="font-weight:600">${r.f.nome}</td>
       <td style="text-align:center">${r.dt}</td>
       <td style="text-align:center;color:${r.dfa>0?'var(--danger)':'inherit'}">${r.dfa}</td>
+      <td style="text-align:center">${r.fer>0?'🎉 '+r.fer:'—'}</td>
       <td style="font-family:'DM Mono',monospace;text-align:right">${fmtH(r.h)}</td>
       <td style="font-family:'DM Mono',monospace;text-align:right;color:var(--warn);font-weight:600;background:#FFFBEB">${fmtH(r.n)}</td>
       <td style="font-family:'DM Mono',monospace;text-align:right;color:var(--accent-text);font-weight:600;background:#F0FDF4">${fmt(r.v)}</td>
@@ -1119,36 +1210,50 @@ function calcSemana() {
     'Semana: '+new Date(seg+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+
     ' (Seg) até '+new Date(domStr+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' (Dom)';
 
-  // calcula comissão de cada funcionário na semana
-  const funcs=DB.funcs.filter(f=>f.nome!=='Victor'&&f.nome!=='Tiago'); // filtra sócios se quiser
-  let total=0;
-  const rows=DB.funcs.map(f=>{
-    let com=0;
+  const funcs=DB.funcs.filter(f=>!f.arquivado);
+  let tH=0,tN=0,tV=0,tC=0,tDt=0,tFer=0;
+
+  const rows=funcs.map(f=>{
+    let h=0,n=0,v=0,c=0,dt=0,df=0,dfa=0,fer=0;
     for(let d=new Date(seg+'T12:00');d<=dom;d.setDate(d.getDate()+1)){
       const ds=d.toISOString().slice(0,10);
+      const p=(DB.ponto[ds]||{})[f.id];
+      if(p){
+        if(p.status==='trabalhou'){dt++;h+=p.horas||0;n+=p.noturnas||0;v+=p.vt||0;
+          if(DB.feriados&&DB.feriados[ds]) fer++;
+        }
+        else if(p.status==='folga')df++;
+        else if(p.status==='falta')dfa++;
+      }
       const cc=(DB.comissao[ds]||{})[f.id];
-      if(cc&&cc.incluir) com+=cc.valor||0;
+      if(cc&&cc.incluir) c+=cc.valor||0;
     }
-    total+=com;
-    return {f,com};
-  }).filter(r=>r.com>0);
+    tH+=h;tN+=n;tV+=v;tC+=c;tDt+=dt;tFer+=fer;
+    return {f,dt,df,dfa,h,n,v,c,fer};
+  }).filter(r=>r.dt>0||r.df>0||r.dfa>0||r.c>0);
 
   document.getElementById('sem-cards').innerHTML=`
-    <div class="metric"><div class="metric-label">Total comissão semana</div><div class="metric-value">${fmt(total)}</div></div>
-    <div class="metric"><div class="metric-label">Funcionários</div><div class="metric-value">${rows.length}</div></div>`;
+    <div class="metric"><div class="metric-label">Dias trabalhados</div><div class="metric-value">${tDt}</div></div>
+    <div class="metric"><div class="metric-label">H. totais</div><div class="metric-value">${fmtH(tH)}</div></div>
+    <div class="metric"><div class="metric-label">H. noturnas</div><div class="metric-value">${fmtH(tN)}</div></div>
+    <div class="metric"><div class="metric-label">Total VT</div><div class="metric-value">${fmt(tV)}</div></div>
+    <div class="metric"><div class="metric-label">Comissões</div><div class="metric-value">${fmt(tC)}</div></div>
+    <div class="metric"><div class="metric-label">Feriados trab.</div><div class="metric-value">${tFer}</div></div>`;
 
   document.getElementById('sem-tabela').innerHTML=rows.length?`
-    <div class="card-title">Valor a pagar na segunda-feira</div>
-    <table><thead><tr><th>Funcionário</th><th>Cargo</th><th style="text-align:right">Comissão da semana</th></tr></thead>
+    <div class="card-title">Detalhamento por funcionário</div>
+    <div class="table-wrap"><table>
+    <thead><tr><th>Funcionário</th><th>Dias trab.</th><th>Folgas</th><th>Faltas</th><th>H. totais</th><th>H. noturnas</th><th>Feriados</th><th>VT total</th><th>Comissão semana</th></tr></thead>
     <tbody>`+rows.map(r=>`<tr>
       <td style="font-weight:600">${r.f.nome}</td>
-      <td style="color:var(--text2)">${r.f.cargo||'—'}</td>
-      <td style="font-family:'DM Mono',monospace;font-weight:600;color:var(--accent);text-align:right;font-size:15px">${fmt(r.com)}</td>
-    </tr>`).join('')+`<tr style="border-top:2px solid var(--border);background:var(--surface2)">
-      <td colspan="2" style="font-weight:600">Total</td>
-      <td style="font-family:'DM Mono',monospace;font-weight:600;text-align:right;font-size:15px">${fmt(total)}</td>
-    </tr></tbody></table>`:
-    '<div class="empty">Nenhuma comissão lançada nesta semana.</div>';
+      <td>${r.dt}</td><td>${r.df}</td><td>${r.dfa}</td>
+      <td style="font-family:'DM Mono',monospace">${fmtH(r.h)}</td>
+      <td style="font-family:'DM Mono',monospace;color:var(--warn)">${fmtH(r.n)}</td>
+      <td style="text-align:center">${r.fer>0?'🎉 '+r.fer:'—'}</td>
+      <td style="font-family:'DM Mono',monospace">${fmt(r.v)}</td>
+      <td style="font-family:'DM Mono',monospace;font-weight:600;color:var(--accent)">${fmt(r.c)}</td>
+    </tr>`).join('')+'</tbody></table></div>':
+    '<div class="empty">Sem dados para esta semana.</div>';
 }
 
 function mudarSemana(delta) {
@@ -1157,6 +1262,100 @@ function mudarSemana(delta) {
   d.setDate(d.getDate()+delta*7);
   el.value=d.toISOString().slice(0,10);
   calcSemana();
+}
+
+// ADIANTAMENTOS
+function renderAdiantamentos() {
+  // populate select
+  const sel=document.getElementById('ad-func');
+  if(sel){
+    const v=sel.value;
+    sel.innerHTML='<option value="">Selecione...</option>'+
+      DB.funcs.filter(f=>!f.arquivado).map(f=>`<option value="${f.id}">${f.nome}</option>`).join('');
+    sel.value=v;
+  }
+  
+  const ads=DB.adiantamentos||[];
+  const pendentes=ads.filter(a=>!a.pago).sort((a,b)=>b.data.localeCompare(a.data));
+  const historico=ads.filter(a=>a.pago).sort((a,b)=>b.data.localeCompare(a.data));
+
+  const elP=document.getElementById('ad-pendentes');
+  if(elP){
+    if(!pendentes.length){elP.innerHTML='<div class="empty">Nenhum adiantamento pendente.</div>';}
+    else{
+      elP.innerHTML='<table><thead><tr><th>Funcionário</th><th>Data</th><th>Valor</th><th>Forma</th><th>Desconto em</th><th>Observação</th><th></th></tr></thead><tbody>'+
+        pendentes.map(a=>{
+          const f=DB.funcs.find(f=>f.id==a.funcId);
+          const formaLabel={'pix':'Pix','dinheiro':'Dinheiro','outro':'Outro'};
+          return `<tr>
+            <td style="font-weight:600">${f?f.nome:'?'}</td>
+            <td>${new Date(a.data+'T12:00').toLocaleDateString('pt-BR')}</td>
+            <td style="font-family:'DM Mono',monospace;font-weight:600;color:var(--danger)">${fmt(a.valor)}</td>
+            <td><span class="badge badge-green">${formaLabel[a.forma]||a.forma||'—'}</span></td>
+            <td><span class="badge ${a.tipo==='comissao'?'badge-amber':'badge-green'}">${a.tipo==='comissao'?'Comissão':'Salário'}</span></td>
+            <td style="color:var(--text2);font-size:12px">${a.obs||'—'}</td>
+            <td style="white-space:nowrap">
+              <button class="btn btn-sm btn-primary" onclick="marcarPago('${a.id}')">✓ Pago</button>
+              <button class="btn btn-sm btn-danger" onclick="removerAd('${a.id}')" style="margin-left:4px">Remover</button>
+            </td>
+          </tr>`;
+        }).join('')+'</tbody></table>';
+    }
+  }
+
+  const elH=document.getElementById('ad-historico');
+  if(elH){
+    if(!historico.length){elH.innerHTML='<div class="empty">Nenhum adiantamento no histórico.</div>';}
+    else{
+      elH.innerHTML='<table><thead><tr><th>Funcionário</th><th>Data</th><th>Valor</th><th>Forma</th><th>Desconto em</th><th>Pago em</th><th>Observação</th></tr></thead><tbody>'+
+        historico.slice(0,30).map(a=>{
+          const f=DB.funcs.find(f=>f.id==a.funcId);
+          return `<tr style="opacity:.7">
+            <td style="font-weight:600">${f?f.nome:'?'}</td>
+            <td>${new Date(a.data+'T12:00').toLocaleDateString('pt-BR')}</td>
+            <td style="font-family:'DM Mono',monospace">${fmt(a.valor)}</td>
+            <td><span class="badge badge-green">${{'pix':'Pix','dinheiro':'Dinheiro','outro':'Outro'}[a.forma]||a.forma||'—'}</span></td>
+            <td><span class="badge ${a.tipo==='comissao'?'badge-amber':'badge-green'}">${a.tipo==='comissao'?'Comissão':'Salário'}</span></td>
+            <td style="font-size:12px;color:var(--text2)">${a.pagoEm?new Date(a.pagoEm+'T12:00').toLocaleDateString('pt-BR'):'—'}</td>
+            <td style="color:var(--text2);font-size:12px">${a.obs||'—'}</td>
+          </tr>`;
+        }).join('')+'</tbody></table>';
+    }
+  }
+}
+
+async function lancarAdiantamento() {
+  const funcId=document.getElementById('ad-func').value;
+  const valor=parseFloat(document.getElementById('ad-valor').value)||0;
+  const data=document.getElementById('ad-data').value;
+  const tipo=document.getElementById('ad-tipo').value;
+  const forma=document.getElementById('ad-forma').value;
+  const obs=document.getElementById('ad-obs').value.trim();
+  if(!funcId){alert('Selecione o funcionário.');return;}
+  if(!valor){alert('Informe o valor.');return;}
+  if(!data){alert('Informe a data.');return;}
+  if(!DB.adiantamentos) DB.adiantamentos=[];
+  DB.adiantamentos.push({id:'ad_'+Date.now(),funcId,valor,data,tipo,forma,obs,pago:false,pagoEm:''});
+  await salvarDados('ad-ok');
+  document.getElementById('ad-valor').value='';
+  document.getElementById('ad-obs').value='';
+  renderAdiantamentos();
+}
+
+async function marcarPago(id) {
+  const a=DB.adiantamentos.find(a=>a.id===id);
+  if(!a)return;
+  a.pago=true;
+  a.pagoEm=new Date().toISOString().slice(0,10);
+  await salvarDados();
+  renderAdiantamentos();
+}
+
+async function removerAd(id) {
+  if(!confirm('Remover adiantamento?'))return;
+  DB.adiantamentos=DB.adiantamentos.filter(a=>a.id!==id);
+  await salvarDados();
+  renderAdiantamentos();
 }
 
 // CALENDÁRIO
